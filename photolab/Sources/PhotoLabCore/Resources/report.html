@@ -1,0 +1,1080 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Baseline Darkroom Report</title>
+<style>
+  :root {
+    /* Neutral greys so the UI doesn't bias how you read colour in the photos. */
+    --bg: #19191a;
+    --surface: #212123;
+    --surface-2: #2a2a2d;
+    --line: #353538;
+    --text: #e9e9eb;
+    --muted: #9b9ba1;
+    --faint: #6c6c72;
+    --accent: #4c9dff;
+    --bad: #ff6159;
+    --warn: #f6b93b;
+    --info: #8e8e96;
+    --good: #3ccf6e;
+    --radius: 8px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font: 13px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: inherit; }
+  .muted { color: var(--muted); }
+
+  /* Header */
+  header { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+  .head-row { display: flex; align-items: baseline; gap: 16px; padding: 14px 20px 6px; flex-wrap: wrap; }
+  h1 { font-size: 18px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+  .meta { color: var(--muted); }
+  .toolbar { display: flex; gap: 8px; padding: 6px 20px 12px; flex-wrap: wrap; align-items: center; }
+  .seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 2px; }
+  .seg button { background: none; border: 0; padding: 4px 10px; border-radius: 5px; cursor: pointer; color: var(--muted); }
+  .seg button { white-space: nowrap; }
+  .stage-bar .seg { flex-wrap: wrap; max-width: 100%; }
+  .seg button[aria-pressed="true"] { background: var(--surface-2); color: var(--text); }
+  .seg button:focus-visible, .chip:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .spacer { flex: 1; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
+  .dot.bad { background: var(--bad); } .dot.warn { background: var(--warn); } .dot.info { background: var(--info); }
+
+  /* Groups + grid */
+  main { padding: 8px 20px 60px; }
+  .group { margin-top: 22px; }
+  .group h2 { font-size: 13px; font-weight: 600; margin: 0 0 2px; }
+  .group .sub { color: var(--muted); margin-bottom: 10px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--card, 220px), 1fr)); gap: 12px; }
+  .card { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; cursor: pointer; text-align: left; padding: 0; }
+  .card:hover { border-color: #4a4a4f; }
+  .card img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; background: #111; }
+  .card .cap { display: flex; align-items: center; gap: 8px; padding: 7px 9px; }
+  .card .name { font-weight: 500; }
+  .card .flags { margin-left: auto; display: inline-flex; gap: 4px; align-items: center; color: var(--muted); }
+  .score { font-weight: 600; min-width: 26px; }
+  .badge { position: absolute; top: 7px; left: 7px; padding: 2px 7px; border-radius: 5px; background: rgba(0,0,0,.62); font-size: 11px; color: #fff; }
+  .badge.best { background: rgba(60,207,110,.85); color: #062; }
+  .card.dim { opacity: .55; }
+  .empty { color: var(--muted); padding: 40px 0; }
+
+  /* Viewer: photo area + side panel, always fits the window (no page scroll). */
+  #viewer { position: fixed; inset: 0; z-index: 20; background: #121213; display: grid; grid-template-columns: minmax(0, 1fr) clamp(300px, 28vw, 380px); grid-template-rows: minmax(0, 1fr); overflow: hidden; }
+  #viewer[hidden] { display: none; }
+  .stage { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .stage-bar { display: flex; align-items: center; gap: 8px 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; flex: none; }
+  .stage-bar .title { font-weight: 600; }
+  .stage-bar #vsub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .iconbtn { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  .iconbtn:hover { background: var(--surface-2); }
+  .iconbtn:disabled { opacity: .45; cursor: default; }
+  .iconbtn.primary { background: #2c3e57; border-color: #3d5a80; }
+  .canvas-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 12px; min-height: 0; min-width: 0; overflow: hidden; }
+  .photo { position: relative; overflow: hidden; flex: none; }
+  #frame { flex: none; display: flex; }
+  #frame.on { background: var(--frame, #fff); box-shadow: 0 0 0 1px rgba(255,255,255,.08); }
+  .chk { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0 5px; cursor: pointer; }
+  .chk input { accent-color: #8e8e96; margin: 0; }
+  .ed-group input[type=text] { width: 100%; margin: 3px 0 2px; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .ed-group input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+  .ed-group .lbl { font-size: 12px; margin-top: 6px; display: block; }
+  .photo img.main { display: block; width: 100%; height: 100%; transform-origin: 50% 50%; }
+  .layer.vig { background: radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,.85) 100%); opacity: 0; }
+  .busy { position: absolute; right: 10px; bottom: 10px; padding: 3px 9px; border-radius: 999px; background: rgba(0,0,0,.6); color: #fff; font-size: 11px; pointer-events: none; }
+  .layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .layer.clip { image-rendering: pixelated; }
+  kbd { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; color: var(--muted); }
+  .seg kbd { margin-left: 5px; }
+
+  .panel { border-left: 1px solid var(--line); background: var(--bg); overflow-y: auto; min-height: 0; min-width: 0; }
+  .tabs { position: sticky; top: 0; z-index: 2; display: flex; gap: 4px; padding: 8px 12px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .tabs button { flex: 1; background: none; border: 1px solid transparent; border-radius: 6px; padding: 5px 8px; cursor: pointer; color: var(--muted); }
+  .tabs button[aria-selected="true"] { background: var(--surface-2); border-color: var(--line); color: var(--text); }
+  .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* Editor */
+  .ed-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ed-top .title { flex: 1 1 100%; }
+  .ed-status { font-size: 12px; color: var(--muted); min-height: 18px; margin-top: 6px; }
+  .ed-status.err { color: var(--bad); }
+  .ed-status.ok { color: var(--good); }
+  .ed-off { color: var(--warn); font-size: 12px; background: rgba(246,185,59,.08); border: 1px solid rgba(246,185,59,.25); border-radius: 6px; padding: 8px 10px; margin-top: 8px; }
+  .ed-group { padding: 10px 16px 6px; border-bottom: 1px solid var(--line); }
+  .ed-group h3 { margin: 0 0 4px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .ctl { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 8px; padding: 3px 0; }
+  .ctl label { color: var(--text); font-size: 12px; }
+  .ctl output { font-size: 12px; color: var(--muted); min-width: 56px; text-align: right; cursor: default; }
+  .ctl.changed output { color: #9cc8ff; }
+  .ctl .track { grid-column: 1 / -1; position: relative; height: 18px; }
+  .ctl .rec { position: absolute; top: 0; width: 2px; height: 6px; margin-left: -1px; background: #b8b8be; border-radius: 1px; pointer-events: none; }
+  .ctl select { grid-column: 1 / -1; width: 100%; margin: 3px 0 2px; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font: inherit; font-size: 12px; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; margin: 0; background: transparent; cursor: pointer; display: block; }
+  input[type=range]::-webkit-slider-runnable-track { height: 3px; background: var(--surface-2); border-radius: 2px; }
+  input[type=range]::-moz-range-track { height: 3px; background: var(--surface-2); border-radius: 2px; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5.5px; border-radius: 50%; background: #d6d6da; border: 0; box-shadow: 0 0 0 1px rgba(0,0,0,.4); }
+  input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #d6d6da; border: 0; }
+  input[type=range]:focus-visible { outline: none; }
+  input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--accent); }
+  input[type=range]:disabled { opacity: .4; cursor: default; }
+  details.why summary { cursor: pointer; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+  details.why .steps { margin-top: 8px; }
+  .sec { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .sec h3 { margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .kv { display: grid; grid-template-columns: 128px 1fr; gap: 3px 10px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; }
+  .flag { display: flex; gap: 8px; padding: 5px 0; }
+  .flag .dot { margin-top: 6px; }
+  .bigscore { display: flex; align-items: baseline; gap: 10px; }
+  .bigscore b { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+  .bars { display: grid; grid-template-columns: 92px 1fr 34px; gap: 4px 8px; align-items: center; margin-top: 8px; }
+  .bar { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--text); opacity: .75; }
+  canvas.hist { width: 100%; height: 110px; display: block; background: #0e0e0f; border-radius: 6px; }
+  .zones { display: grid; grid-template-columns: repeat(11, 1fr); gap: 2px; align-items: end; height: 56px; margin-top: 10px; }
+  .zones div { border-radius: 2px 2px 0 0; min-height: 1px; }
+  .zlabels { display: grid; grid-template-columns: repeat(11, 1fr); gap: 2px; font-size: 10px; color: var(--faint); text-align: center; margin-top: 3px; }
+  .palette { display: flex; height: 26px; border-radius: 6px; overflow: hidden; margin: 4px 0 6px; }
+  .palette div { min-width: 2px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--muted); font-size: 12px; }
+  .swatches span { display: inline-flex; align-items: center; gap: 5px; }
+  .swatches i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .legend { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--muted); font-size: 12px; }
+  .legend .ramp { height: 8px; flex: 1; border-radius: 4px; background: linear-gradient(90deg, #3ccf6e, #f6b93b, #ff6159); }
+  .note { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .recipe { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .steps { display: grid; gap: 9px; }
+  .steps .st b { font-weight: 600; }
+  .steps .st .v { color: var(--text); }
+  .steps .st p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+  code.path { display: block; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; margin-top: 6px; color: var(--muted); word-break: break-all; user-select: all; }
+  .pill { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); margin-left: 6px; }
+  .pill.mine { background: rgba(76,157,255,.18); color: #9cc8ff; }
+
+  @media (max-width: 900px) {
+    #viewer { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 55%) minmax(0, 1fr); }
+    .panel { border-left: 0; border-top: 1px solid var(--line); }
+    main, .head-row, .toolbar { padding-left: 16px; padding-right: 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="head-row">
+    <h1 id="shoot"></h1>
+    <span class="meta" id="meta"></span>
+  </div>
+  <div class="toolbar">
+    <div class="seg" role="group" aria-label="Filter">
+      <button data-filter="all" aria-pressed="true">All</button>
+      <button data-filter="attention" aria-pressed="false">Needs attention</button>
+      <button data-filter="best" aria-pressed="false">Hide burst extras</button>
+    </div>
+    <div class="seg" role="group" aria-label="Sort">
+      <button data-sort="time" aria-pressed="true">Time</button>
+      <button data-sort="score" aria-pressed="false">Technical score</button>
+      <button data-sort="sharp" aria-pressed="false">Sharpness</button>
+      <button data-sort="street" aria-pressed="false">Street score</button>
+    </div>
+    <div class="seg" role="group" aria-label="Show">
+      <button data-show="edit" aria-pressed="true">Edited</button>
+      <button data-show="orig" aria-pressed="false">Original</button>
+    </div>
+    <span class="spacer"></span>
+    <span id="summary" style="display:flex;gap:6px;flex-wrap:wrap"></span>
+    <button class="iconbtn" id="exportAll" hidden title="Full-resolution JPEGs of every photo with its current edit">Export all</button>
+    <span class="muted" id="exportAllStatus" style="font-size:12px"></span>
+  </div>
+</header>
+<main id="groups"></main>
+
+<div id="viewer" hidden>
+  <div class="stage">
+    <div class="stage-bar">
+      <button class="iconbtn" id="close" title="Close (Esc)">← Grid</button>
+      <button class="iconbtn" id="prev" title="Previous (←)">‹</button>
+      <button class="iconbtn" id="next" title="Next (→)">›</button>
+      <span class="title" id="vtitle"></span>
+      <span class="muted" id="vsub"></span>
+      <span class="spacer"></span>
+      <div class="seg" role="group" aria-label="Before and after" id="ba">
+        <button data-ba="edit" aria-pressed="true">Edited</button>
+        <button data-ba="orig" aria-pressed="false">Original<kbd>\</kbd></button>
+      </div>
+      <div class="seg" role="group" aria-label="Frame preview">
+        <button id="frameBtn" aria-pressed="false" title="Preview the export frame (B)">Frame<kbd>B</kbd></button>
+      </div>
+      <div class="seg" role="group" aria-label="Overlays" id="overlays">
+        <button data-ov="clip" aria-pressed="false">Clipping<kbd>H</kbd></button>
+        <button data-ov="focus" aria-pressed="false">Focus map<kbd>F</kbd></button>
+        <button data-ov="subject" aria-pressed="false">Subject<kbd>S</kbd></button>
+        <button data-ov="lines" aria-pressed="false">Verticals<kbd>V</kbd></button>
+        <button data-ov="grid" aria-pressed="false">Thirds<kbd>G</kbd></button>
+        <button data-ov="crop" aria-pressed="false" id="cropbtn">Crop<kbd>C</kbd></button>
+      </div>
+    </div>
+    <div class="canvas-wrap" id="wrap">
+      <div id="frame"><div class="photo" id="photo">
+        <img class="main" id="mainimg" alt="">
+        <div class="layer vig" id="vigapprox"></div>
+        <img class="layer clip" id="clipimg" alt="" hidden>
+        <canvas class="layer" id="focuscv" hidden></canvas>
+        <svg class="layer" id="svg" viewBox="0 0 1 1" preserveAspectRatio="none"></svg>
+        <span class="busy" id="busy" hidden>Rendering…</span>
+      </div></div>
+    </div>
+  </div>
+  <aside class="panel" id="panel">
+    <div class="tabs" role="tablist" aria-label="Panel">
+      <button role="tab" id="tab-edit" data-tab="edit" aria-selected="true" aria-controls="pane-edit">Edit</button>
+      <button role="tab" id="tab-analysis" data-tab="analysis" aria-selected="false" aria-controls="pane-analysis">Analysis</button>
+    </div>
+    <div role="tabpanel" id="pane-edit" aria-labelledby="tab-edit"></div>
+    <div role="tabpanel" id="pane-analysis" aria-labelledby="tab-analysis" hidden></div>
+  </aside>
+</div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="wbapprox" color-interpolation-filters="sRGB"><feColorMatrix id="wbmatrix" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0"/></filter>
+</svg>
+
+<script src="report.js"></script>
+<script>
+(() => {
+  const R = window.REPORT;
+  const $ = (s, el = document) => el.querySelector(s);
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fmt = (v, d = 1, unit = '') => v == null ? '—' : (Number(v).toFixed(d) + unit);
+  const sgn = (v, d = 1) => v == null ? '—' : ((v > 0 ? '+' : '') + Number(v).toFixed(d));
+  const byId = Object.fromEntries(R.photos.map(p => [p.id, p]));
+  const state = { show: 'edit', ba: 'edit', filter: 'all', sort: 'time', index: -1, order: [], ov: { clip: false, focus: false, subject: false, lines: false, grid: false, crop: false }, cropIdx: 0, tab: 'edit' };
+  // Editing needs `photolab serve`; null = still checking, false = static file view.
+  let server = null;
+  const ver = e => e && e.version ? '?v=' + e.version : '';
+  const editThumb = p => p.edit && p.edit.thumb ? p.edit.thumb.split('?')[0] + ver(p.edit) : null;
+  const editPreview = p => p.edit && p.edit.preview ? p.edit.preview.split('?')[0] + ver(p.edit) : null;
+
+  // ---------- Header ----------
+  $('#shoot').textContent = R.name;
+  const top = o => Object.entries(o).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+  const date = (R.stats.start || '').slice(0, 10).replace(/:/g, '-');
+  $('#meta').textContent = [`${R.photoCount} photos`, date, top(R.stats.cameras)[0], top(R.stats.lenses).join(', '), top(R.stats.filmSimulations).join(', '), `${R.groups.length} scenes`].filter(Boolean).join('  ·  ');
+  const sevCount = { bad: 0, warn: 0 };
+  R.photos.forEach(p => { if (p.flags.some(f => f.severity === 'bad')) sevCount.bad++; else if (p.flags.some(f => f.severity === 'warn')) sevCount.warn++; });
+  $('#summary').innerHTML = `<span class="chip"><span class="dot bad"></span>${sevCount.bad} with problems</span><span class="chip"><span class="dot warn"></span>${sevCount.warn} with warnings</span><span class="chip">Engine ${esc(R.engineVersion)} · deterministic, on-device</span>`;
+
+  const sevOf = p => p.flags.some(f => f.severity === 'bad') ? 'bad' : p.flags.some(f => f.severity === 'warn') ? 'warn' : null;
+  const width = p => p.sharpness.subjectWidth ?? p.sharpness.bestWidth ?? 99;
+
+  // ---------- Grid ----------
+  function visible(p) {
+    if (state.filter === 'attention') return !!sevOf(p);
+    if (state.filter === 'best') return p.burstId == null || p.bestInBurst;
+    return true;
+  }
+  function sortIds(ids) {
+    const ps = ids.map(id => byId[id]);
+    if (state.sort === 'score') ps.sort((a, b) => b.score.total - a.score.total);
+    if (state.sort === 'sharp') ps.sort((a, b) => width(a) - width(b));
+    if (state.sort === 'street') ps.sort((a, b) => (b.street?.score.total ?? 0) - (a.street?.score.total ?? 0));
+    return ps;
+  }
+  function renderGrid() {
+    const root = $('#groups');
+    root.innerHTML = '';
+    state.order = [];
+    for (const g of R.groups) {
+      const ps = sortIds(g.photoIds).filter(visible);
+      if (!ps.length) continue;
+      const sec = document.createElement('section');
+      sec.className = 'group';
+      const bursts = g.bursts.length ? ` · ${g.bursts.length} burst${g.bursts.length > 1 ? 's' : ''}` : '';
+      sec.innerHTML = `<h2>${esc(g.title)}</h2><div class="sub">${g.photoIds.length} photo${g.photoIds.length > 1 ? 's' : ''}${bursts}${g.topTags.length ? ' · ' + esc(g.topTags.slice(0, 5).join(', ')) : ''}</div><div class="grid"></div>`;
+      const grid = $('.grid', sec);
+      for (const p of ps) {
+        const i = state.order.push(p.id) - 1;
+        const sev = sevOf(p);
+        const nBad = p.flags.filter(f => f.severity === 'bad').length, nWarn = p.flags.filter(f => f.severity === 'warn').length;
+        const card = document.createElement('button');
+        card.className = 'card' + (p.burstId != null && !p.bestInBurst ? ' dim' : '');
+        card.dataset.id = p.id;
+        card.setAttribute('aria-label', `${p.file}, score ${p.score.total}`);
+        let badge = '';
+        if (p.burstId != null) badge = p.bestInBurst ? '<span class="badge best">Best of burst</span>' : '<span class="badge">Burst</span>';
+        else if (p.nearDuplicateOf) badge = '<span class="badge">Similar</span>';
+        const th = state.show === 'edit' && editThumb(p) ? editThumb(p) : p.thumb;
+        card.innerHTML = `<img loading="lazy" src="${esc(th)}" alt="">${badge}
+          <div class="cap"><span class="score" title="Technical score">${Math.round(p.score.total)}</span>${streetBadge(p)}<span class="name">${esc(p.id)}</span>
+          <span class="flags">${nBad ? `<span class="dot bad"></span>${nBad}` : ''}${nWarn ? `<span class="dot warn"></span>${nWarn}` : ''}${!sev ? '<span class="dot" style="background:var(--good)"></span>' : ''}</span></div>`;
+        card.addEventListener('click', () => open(i));
+        grid.appendChild(card);
+      }
+      root.appendChild(sec);
+    }
+    if (!state.order.length) root.innerHTML = '<p class="empty">No photos match this filter.</p>';
+  }
+
+  document.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => {
+    state.filter = b.dataset.filter;
+    document.querySelectorAll('[data-filter]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    renderGrid();
+  }));
+  document.querySelectorAll('[data-sort]').forEach(b => b.addEventListener('click', () => {
+    state.sort = b.dataset.sort;
+    document.querySelectorAll('[data-sort]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    renderGrid();
+  }));
+
+  document.querySelectorAll('[data-show]').forEach(b => b.addEventListener('click', () => {
+    state.show = b.dataset.show;
+    document.querySelectorAll('[data-show]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    renderGrid();
+  }));
+
+  // ---------- Viewer ----------
+  const viewer = $('#viewer');
+  function open(i) {
+    state.index = i;
+    viewer.hidden = false;
+    document.body.style.overflow = 'hidden';
+    show();
+  }
+  function close() { viewer.hidden = true; document.body.style.overflow = ''; flushRender(); }
+  function step(d) { if (!state.order.length) return; flushRender(); state.index = (state.index + d + state.order.length) % state.order.length; show(); }
+
+  function fitPhoto() {
+    const p = byId[state.order[state.index]];
+    if (!p) return;
+    const wrap = $('#wrap').getBoundingClientRect();
+    const aw = wrap.width - 24, ah = wrap.height - 24;
+    if (aw <= 0 || ah <= 0) return;
+    // Frame preview: the same proportions the export uses (% of the long edge).
+    const fs = exp.settings, on = state.framePreview && fs.frame;
+    const long = Math.max(p.width, p.height);
+    const fx = on ? long * fs.side / 100 : 0, fy = on ? long * fs.topBottom / 100 : 0;
+    const s = Math.min(aw / (p.width + 2 * fx), ah / (p.height + 2 * fy));
+    const photo = $('#photo'), frame = $('#frame');
+    photo.style.width = Math.floor(p.width * s) + 'px';
+    photo.style.height = Math.floor(p.height * s) + 'px';
+    frame.classList.toggle('on', on);
+    frame.style.padding = on ? `${Math.round(fy * s)}px ${Math.round(fx * s)}px` : '0';
+    frame.style.setProperty('--frame', fs.color || '#fff');
+    $('#frameBtn').setAttribute('aria-pressed', on);
+    drawFocus(p);
+  }
+
+  function show() {
+    const p = byId[state.order[state.index]];
+    const edited = state.ba === 'edit' && editPreview(p);
+    const src = edited ? editPreview(p) : p.preview;
+    if ($('#mainimg').getAttribute('src') !== src) $('#mainimg').src = src;
+    document.querySelectorAll('[data-ba]').forEach(b => b.setAttribute('aria-pressed', b.dataset.ba === (edited ? 'edit' : 'orig')));
+    $('#mainimg').alt = p.file;
+    $('#clipimg').src = p.clipOverlay;
+    $('#vtitle').textContent = p.file;
+    const c = p.capture;
+    $('#vsub').textContent = [c.shutter, c.fNumber ? 'f/' + c.fNumber : null, c.iso ? 'ISO ' + c.iso : null, c.focalLength ? c.focalLength + 'mm' : null, (c.dateTimeOriginal || '').slice(11)].filter(Boolean).join('  ·  ');
+    fitPhoto();
+    applyOverlays();
+    if (!ed || ed.id !== p.id) { renderPanel(p); openEditor(p); }
+    applyApprox();
+  }
+
+  function applyOverlays() {
+    const p = byId[state.order[state.index]];
+    document.querySelectorAll('[data-ov]').forEach(b => b.setAttribute('aria-pressed', !!state.ov[b.dataset.ov]));
+    const crops = p.composition.crops;
+    $('#cropbtn').firstChild.textContent = state.ov.crop ? `Crop ${crops[state.cropIdx].aspect}` : 'Crop';
+    $('#clipimg').hidden = !state.ov.clip;
+    $('#focuscv').hidden = !state.ov.focus;
+    drawSVG(p);
+  }
+
+  function drawFocus(p) {
+    const cv = $('#focuscv');
+    const box = $('#photo').getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(box.width * dpr); cv.height = Math.round(box.height * dpr);
+    const ctx = cv.getContext('2d');
+    const s = p.sharpness;
+    const tw = cv.width / s.cols, th = cv.height / s.rows;
+    // Green = sharp, amber = slightly soft, red = soft; empty = no edges to measure.
+    const color = w => { const t = Math.min(1, Math.max(0, (w - 1.3) / (3.5 - 1.3))); const h = 140 - 140 * t; return `hsla(${h}, 75%, 50%, 0.42)`; };
+    s.tiles.forEach((w, i) => {
+      if (w == null) return;
+      const x = (i % s.cols) * tw, y = Math.floor(i / s.cols) * th;
+      ctx.fillStyle = color(w);
+      ctx.fillRect(x + 1, y + 1, tw - 2, th - 2);
+      if (tw > 34 * dpr) { ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = `${10 * dpr}px -apple-system, sans-serif`; ctx.fillText(w.toFixed(1), x + 4 * dpr, y + 13 * dpr); }
+    });
+    if (s.bestTile) {
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2 * dpr;
+      ctx.strokeRect(s.bestTile[0] * tw + 1, s.bestTile[1] * th + 1, tw - 2, th - 2);
+    }
+  }
+
+  function drawSVG(p) {
+    const svg = $('#svg');
+    const box = $('#photo').getBoundingClientRect();
+    const sx = 1 / Math.max(1, box.width);   // one screen pixel in viewBox units (x)
+    const sy = 1 / Math.max(1, box.height);
+    const stroke = (px = 1.5) => `stroke-width="${px * sx}"`;
+    let out = '';
+    const c = p.composition;
+    if (state.ov.grid) {
+      for (const t of [1 / 3, 2 / 3]) {
+        out += `<line x1="${t}" y1="0" x2="${t}" y2="1" stroke="rgba(255,255,255,.7)" ${stroke(1)}/>`;
+        out += `<line x1="0" y1="${t}" x2="1" y2="${t}" stroke="rgba(255,255,255,.7)" ${stroke(1)}/>`;
+      }
+    }
+    if (state.ov.lines) {
+      for (const l of c.lines) out += `<line x1="${l[0]}" y1="0" x2="${l[2]}" y2="1" stroke="#ff3fa4" ${stroke(1.5)}/>`;
+      for (const t of [0.25, 0.5, 0.75]) out += `<line x1="${t}" y1="0" x2="${t}" y2="1" stroke="rgba(255,230,0,.55)" stroke-dasharray="${6 * sy} ${4 * sy}" ${stroke(1)}/>`;
+    }
+    if (state.ov.subject) {
+      for (const o of c.salientObjects) out += `<rect x="${o[0]}" y="${o[1]}" width="${o[2]}" height="${o[3]}" fill="none" stroke="rgba(255,255,255,.6)" stroke-dasharray="${5 * sy} ${4 * sy}" ${stroke(1)}/>`;
+      for (const f of p.faces) out += `<rect x="${f.rect[0]}" y="${f.rect[1]}" width="${f.rect[2]}" height="${f.rect[3]}" fill="none" stroke="${f.eyesClosed ? 'var(--bad)' : '#4c9dff'}" ${stroke(2)}/>`;
+      if (p.capture.afPoint) { const a = p.capture.afPoint; out += `<rect x="${a[0]}" y="${a[1]}" width="${a[2]}" height="${a[3]}" fill="none" stroke="#3ccf6e" ${stroke(2)}/>`; }
+      const [x, y] = c.subject;
+      out += `<line x1="${x - 12 * sx}" y1="${y}" x2="${x + 12 * sx}" y2="${y}" stroke="#fff" ${stroke(2)}/><line x1="${x}" y1="${y - 12 * sy}" x2="${x}" y2="${y + 12 * sy}" stroke="#fff" ${stroke(2)}/>`;
+    }
+    if (state.ov.crop) {
+      const r = c.crops[state.cropIdx].rect;
+      out += `<path fill="rgba(0,0,0,.6)" fill-rule="evenodd" d="M0 0H1V1H0Z M${r[0]} ${r[1]}h${r[2]}v${r[3]}h${-r[2]}Z"/>`;
+      out += `<rect x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" fill="none" stroke="#fff" ${stroke(1.5)}/>`;
+    }
+    svg.innerHTML = out;
+  }
+
+  function toggle(name) {
+    if (name === 'crop') {
+      const n = byId[state.order[state.index]].composition.crops.length;
+      if (!state.ov.crop) { state.ov.crop = true; state.cropIdx = 0; }
+      else if (state.cropIdx < n - 1) state.cropIdx++;
+      else state.ov.crop = false;
+    } else state.ov[name] = !state.ov[name];
+    applyOverlays();
+  }
+  document.querySelectorAll('[data-ov]').forEach(b => b.addEventListener('click', () => toggle(b.dataset.ov)));
+  document.querySelectorAll('[data-ba]').forEach(b => b.addEventListener('click', () => { state.ba = b.dataset.ba; show(); }));
+  $('#close').addEventListener('click', close);
+  $('#prev').addEventListener('click', () => step(-1));
+  $('#next').addEventListener('click', () => step(1));
+  const refit = () => { if (!viewer.hidden && state.index >= 0) { fitPhoto(); drawSVG(byId[state.order[state.index]]); } };
+  window.addEventListener('resize', refit);
+  if (window.ResizeObserver) new ResizeObserver(refit).observe($('#wrap'));
+  document.addEventListener('keydown', e => {
+    if (viewer.hidden || e.metaKey || e.ctrlKey || e.altKey) return;
+    // Shortcuts never fire while typing or adjusting a control (arrow keys move the slider then).
+    const t = e.target;
+    if (t && (t.matches('input, select, textarea, [contenteditable]'))) { if (e.key === 'Escape') t.blur(); return; }
+    const k = e.key.toLowerCase();
+    if (k === 'escape') close();
+    else if (k === 'arrowright') step(1);
+    else if (k === 'arrowleft') step(-1);
+    else if (k === '\\' || e.code === 'Backslash') { state.ba = state.ba === 'edit' ? 'orig' : 'edit'; show(); }
+    else if (k === 'e' && !e.shiftKey) setTab(state.tab === 'edit' ? 'analysis' : 'edit');
+    else if (k === 'b') toggleFramePreview();
+    else if ({ h: 'clip', f: 'focus', s: 'subject', v: 'lines', g: 'grid', c: 'crop' }[k]) toggle({ h: 'clip', f: 'focus', s: 'subject', v: 'lines', g: 'grid', c: 'crop' }[k]);
+    else return;
+    e.preventDefault();
+  });
+
+  // ---------- Panel ----------
+  const kv = rows => '<dl class="kv">' + rows.filter(r => r && r[1] != null && r[1] !== '').map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('') + '</dl>';
+  const sec = (title, body) => `<section class="sec"><h3>${esc(title)}</h3>${body}</section>`;
+
+  function renderPanel(p) {
+    const t = p.tone, s = p.sharpness, n = p.noise, col = p.color, comp = p.composition, c = p.capture, f = p.fuji, sc = p.score;
+    const group = R.groups[p.groupId];
+    let html = '';
+
+    html += renderStreet(p);
+
+    // Verdict
+    const flags = p.flags.length ? p.flags.map(fl => `<div class="flag"><span class="dot ${fl.severity}"></span><div>${esc(fl.message)}</div></div>`).join('') : '<div class="flag"><span class="dot" style="background:var(--good)"></span><div>No technical problems found.</div></div>';
+    const bar = (label, v) => v == null ? '' : `<span class="muted">${label}</span><span class="bar"><i style="width:${v}%"></i></span><span>${Math.round(v)}</span>`;
+    html += sec('Assessment', `<div class="bigscore"><b>${Math.round(sc.total)}</b><span class="muted">technical score · ${s.shootPercentile != null ? `sharper than ${Math.round(s.shootPercentile)}% of this shoot` : ''}</span></div>
+      <div class="bars">${bar('Sharpness', sc.sharpness)}${bar('Exposure', sc.exposure)}${bar('Composition', sc.composition)}${bar('Eyes', sc.eyes)}</div>
+      <div style="margin-top:10px">${flags}</div>
+      <p class="note">The score is fixed rules (40% sharpness, 30% exposure, 15% composition, 15% eyes), not taste. It will learn from your picks later.</p>`);
+
+    // Exposure
+    html += sec('Exposure & tone', `<canvas class="hist" id="hist"></canvas>
+      <div class="zones" id="zones"></div><div class="zlabels">${['0','I','II','III','IV','V','VI','VII','VIII','IX','X'].map(z => `<span>${z}</span>`).join('')}</div>
+      ${kv([
+        ['From middle grey', sgn(t.evFromMiddleGrey) + ' EV'],
+        ['Median L*', `${fmt(t.medianLstar, 0)} <span class="muted">(${esc(t.key)})</span>`],
+        ['Tonal range', fmt(t.tonalRangeStops, 1, ' stops') + ` <span class="muted">(L* ${fmt(t.lstarP1, 0)}–${fmt(t.lstarP99, 0)})</span>`],
+        ['Highlights clipped', `${fmt(t.highlightClipAny, 2, '%')} any channel · ${fmt(t.highlightClipAll, 2, '%')} pure white`],
+        ['Per channel', `R ${fmt(t.highlightClipChannels[0], 2)} · G ${fmt(t.highlightClipChannels[1], 2)} · B ${fmt(t.highlightClipChannels[2], 2)} %`],
+        ['Largest blown area', `${fmt(t.largestHighlightRegion, 2, '%')} of frame <span class="muted">(${esc(t.highlightType)})</span>`],
+        ['Shadows clipped', fmt(t.shadowClip, 2, '%') + ' pure black'],
+        ['Contrast', `global ${fmt(t.globalContrast, 1)} · local ${fmt(t.localContrast, 2)} <span class="muted">(L* σ / detail)</span>`],
+        ['Exposure', `${esc(c.exposureProgram || '')}${c.exposureBias ? ', comp ' + sgn(c.exposureBias, 1) : ''}${c.meteringMode ? ', ' + esc(c.meteringMode) : ''}`],
+      ])}<p class="note">Zones: Ansel Adams scale, Zone V = 18% grey, one stop per zone. Measured on the full-resolution JPEG.</p>`);
+
+    // Sharpness
+    html += sec('Focus & sharpness', kv([
+      ['Sharpest area', s.bestWidth != null ? `${fmt(s.bestWidth, 2)} px edge rise <span class="muted">(${esc(s.level)})</span>` : 'No measurable edges'],
+      ['On the face', s.subjectWidth != null ? fmt(s.subjectWidth, 2, ' px') : null],
+      ['At web size', s.webWidth != null ? fmt(s.webWidth, 2, ' px at 2048 px') : null],
+      ['Direction', s.anisotropy != null ? `H/V ratio ${fmt(s.anisotropy, 2)}${s.motionHint ? ` <span style="color:var(--warn)">· ${esc(s.motionHint)} motion</span>` : ''}` : null],
+      ['Shutter vs handheld', c.shutter && s.handheldLimit ? `${esc(c.shutter)} vs ${esc(s.handheldLimit)} guideline${s.shakeRisk ? ' <span style="color:var(--warn)">· slower</span>' : ''}` : null],
+      ['Focus mode', esc(c.focusMode || '')],
+      ['Shoot rank', s.shootPercentile != null ? `sharper than ${Math.round(s.shootPercentile)}% of this shoot` : null],
+    ]) + `<div class="legend"><span>1.3 px</span><span class="ramp"></span><span>3.5 px</span></div><p class="note">Edge rise = 10–90% transition width of the sharpest edges, in pixels at 100%. Lower is sharper. Press F for the map.</p>`);
+
+    // Colour
+    const pal = col.palette;
+    html += sec('Colour', `<div class="palette">${pal.map(x => `<div style="flex:${x.weight};background:${x.hex}" title="${x.hex} · ${x.weight}%"></div>`).join('')}</div>
+      <div class="swatches">${pal.map(x => `<span><i style="background:${x.hex}"></i>${x.hex} ${Math.round(x.weight)}%</span>`).join('')}</div>
+      ${kv([
+        ['Harmony', esc(col.harmony)],
+        ['Neutral cast', `${esc(col.castName)} <span class="muted">(a* ${sgn(col.castA)}, b* ${sgn(col.castB)}, ${esc(col.castConfidence)} confidence)</span>`],
+        ['Neutral pixels', fmt(col.neutralFraction, 1, '%')],
+        ['Warmth', sgn(col.warmth) + ' <span class="muted">mean b*</span>'],
+        ['Saturation', `mean C* ${fmt(col.meanChroma, 0)} · p95 ${fmt(col.p95Chroma, 0)}`],
+        ['Gamut clipping', fmt(col.saturationClip, 2, '%')],
+        ...p.faces.filter(fc => fc.skinAngle != null).slice(0, 3).map((fc, i) => [`Skin (face ${i + 1})`, `${fmt(fc.skinAngle, 0)}° <span class="muted">(${sgn(fc.skinOffset, 0)}° from the 123° skin line)</span>`]),
+      ])}`);
+
+    // Grain
+    html += sec('Grain & noise', kv([
+      ['Level', `${esc(n.level)}${n.lumaSigma != null ? ` <span class="muted">(σ ${fmt(n.lumaSigma, 2)} levels)</span>` : ''}`],
+      ['By tone', `shadows ${fmt(n.shadowSigma, 2)} · mids ${fmt(n.midSigma, 2)} · highlights ${fmt(n.highlightSigma, 2)}`],
+      ['Scale', n.coarseness != null ? `${fmt(n.coarseness, 2)} <span class="muted">(1 = fine/pixel-level, higher = coarser grain)</span>` : null],
+      ['Colour noise', fmt(n.chromaSigma, 2)],
+      ['Grain Effect', f ? esc(f.grainEffect) : null],
+    ]));
+
+    // Composition
+    html += sec('Composition', kv([
+      ['Subject', `${esc(comp.placement)} <span class="muted">(from ${esc(comp.subjectSource)})</span>`],
+      ['Level', comp.horizonTilt != null ? `${Math.abs(comp.horizonTilt).toFixed(1)}° ${comp.horizonTilt > 0 ? 'clockwise' : comp.horizonTilt < 0 ? 'counter-clockwise' : ''} <span class="muted">(${esc(comp.tiltSource)})</span>` : '<span class="muted">not enough straight lines to judge</span>'],
+      ['Converging verticals', comp.keystone != null ? `${fmt(comp.keystone, 1)}° at the frame edges` : null],
+      ['Headroom', comp.headroom != null ? fmt(comp.headroom, 2) + ' face-heights' : null],
+      ['Balance', `${comp.balance[0] > 0.02 ? 'weighted right' : comp.balance[0] < -0.02 ? 'weighted left' : 'even left/right'}, ${comp.balance[1] > 0.02 ? 'bottom-heavy' : comp.balance[1] < -0.02 ? 'top-heavy' : 'even top/bottom'}`],
+      ['Bright edges', comp.brightEdges.length ? esc(comp.brightEdges.join(', ')) : 'none'],
+      ['Faces', p.faces.length ? p.faces.map(fc => `${fc.eyesClosed ? 'eyes closed' : 'eyes open'}${fc.captureQuality != null ? ` (quality ${fc.captureQuality})` : ''}`).join('; ') : 'none detected'],
+      ['Crops', comp.crops.map(x => x.aspect).join(' · ') + ' <span class="muted">(press C)</span>'],
+    ]));
+
+    // Camera
+    if (f) {
+      html += sec('Camera recipe', `<div>${esc(f.filmSimulation)}</div><div class="recipe">${esc(f.recipe)}</div>` + kv([
+        ['Dynamic range', esc(f.dynamicRange || f.dynamicRangeSetting || '')],
+        ['Highlight / Shadow', `${sgn(f.highlightTone, 1)} / ${sgn(f.shadowTone, 1)}`],
+        ['Color / Sharpness', `${esc(f.color || '—')} / ${esc(f.sharpness || '—')}`],
+        ['Noise reduction', esc(f.noiseReduction || '')],
+        ['Color Chrome', `${esc(f.colorChrome)} · FX Blue ${esc(f.colorChromeBlue)}`],
+        ['White balance', `${esc(f.whiteBalance || '')}${f.whiteBalanceShift ? ` · R${sgn(f.whiteBalanceShift[0], 0)} B${sgn(f.whiteBalanceShift[1], 0)}` : ''}`],
+        ['Quality', esc(f.quality || '')],
+        ['Camera warnings', f.cameraWarnings.length ? esc(f.cameraWarnings.join(', ')) : null],
+      ]));
+    }
+    html += sec('Capture', kv([
+      ['Camera', esc([c.make, c.model].filter(Boolean).join(' '))],
+      ['Lens', esc(c.lens || '') + (c.manualLens ? ' <span class="muted">(manual, no aperture data)</span>' : '')],
+      ['Exposure', esc([c.shutter, c.fNumber ? 'f/' + c.fNumber : null, c.iso ? 'ISO ' + c.iso : null].filter(Boolean).join(' · '))],
+      ['Focal length', c.focalLength ? `${c.focalLength} mm${c.focalLength35 ? ` (${c.focalLength35} mm equiv.)` : ''}` : null],
+      ['Captured', esc(c.dateTimeOriginal || '')],
+      ['File', `${esc(p.file)} · ${p.width}×${p.height}`],
+    ]));
+
+    // Scene
+    html += sec('Scene & grouping', `<div class="tags">${p.scene.tags.map(x => `<span class="chip" title="${Math.round(x.confidence * 100)}%">${esc(x.label)}</span>`).join('') || '<span class="muted">No confident tags</span>'}</div>` + kv([
+      ['Scene', esc(group ? group.title : '')],
+      ['Burst', p.burstId != null ? (p.bestInBurst ? 'best frame of its burst' : 'part of a burst') : null],
+      ['Similar to', p.nearDuplicateOf ? esc(p.nearDuplicateOf) : null],
+      ['People', p.scene.peopleCount ? String(p.scene.peopleCount) : null],
+    ]));
+
+    $('#pane-analysis').innerHTML = html;
+    $('#panel').scrollTop = 0;
+    if (state.tab === 'analysis') drawHist(t);
+    drawZones(t);
+  }
+
+  // ---------- Street read (p.street: the photographer-facing read, top of the Analysis tab) ----------
+  const STREET_WEIGHTS = [
+    ['Subject', 'subject', 25], ['Moment', 'moment', 25], ['Layering', 'layering', 10],
+    ['Light', 'light', 15], ['Colour', 'color', 15], ['Composition', 'composition', 10],
+  ];
+
+  function renderStreet(p) {
+    const s = p && p.street;
+    if (!s) return '';
+    const sc = s.score;
+    const clamp = v => Math.max(0, Math.min(100, v));
+    const bar = (label, v) => v == null ? '' :
+      `<span class="muted">${esc(label)}</span><span class="bar"><i style="width:${clamp(v)}%"></i></span><span>${Math.round(v)}</span>`;
+    const item = (text, color) =>
+      `<div class="flag"><span class="dot" style="background:var(${color})"></span><div>${esc(text)}</div></div>`;
+
+    // 1. The read: plain-language observations, in order of importance.
+    let html = sec('Street read', s.read.length
+      ? s.read.map(t => `<p style="margin:0 0 7px;line-height:1.45">${esc(t)}</p>`).join('')
+      : '<p class="muted" style="margin:0">Nothing to read.</p>');
+
+    // 2. Strengths and weaknesses.
+    if (s.strengths.length || s.weaknesses.length) {
+      html += sec('Works · doesn’t',
+        s.strengths.map(t => item(t, '--good')).join('') + s.weaknesses.map(t => item(t, '--warn')).join(''));
+    }
+
+    // 3. Street score and its fixed-weight breakdown.
+    const tiers = s.tiers || {};
+    const people = s.people.length
+      ? `${s.people.length} <span class="muted">(${tiers.near || 0} near · ${tiers.mid || 0} mid · ${tiers.far || 0} far)</span>`
+      : 'none detected';
+    const col = s.color;
+    const colour = [
+      esc(col.character),
+      col.complementary ? esc(col.complementary.join(' / ')) : null,
+      col.accent ? esc(col.accent) + ' accent' : null,
+      col.field ? esc(col.field) + ' field' : null,
+    ].filter(Boolean).join(' · ');
+    const light = esc(s.light.kind) + (s.light.subject ? ` <span class="muted">· subject ${esc(s.light.subject)}</span>` : '');
+    html += sec('Street score', `<div class="bigscore"><b>${Math.round(sc.total)}</b><span class="muted">street score</span></div>
+      <div class="bars">${STREET_WEIGHTS.map(([label, key]) => bar(label, sc[key])).join('')}</div>
+      ${kv([
+        ['People', people],
+        ['Gesture energy', s.gestureEnergy > 0 ? `${Math.round(s.gestureEnergy * 100)}%` : 'none read'],
+        ['Eye contact', s.eyeContact ? 'likely' : null],
+        ['Interaction', s.interaction ? esc(s.interaction) : null],
+        ['Light', light],
+        ['Colour', colour],
+      ])}
+      <p class="note">Fixed weights: ${STREET_WEIGHTS.map(([l, , w]) => `${l.toLowerCase()} ${w}%`).join(', ')}. Read on-device from Apple Vision and the pixels, not taste: it can miss people who are very close, cropped, seen from behind or in silhouette, and it cannot see expression or meaning.</p>`);
+    return html;
+  }
+
+  // Small street score for grid cards (matches the technical .score span).
+  function streetBadge(p) {
+    const s = p && p.street;
+    if (!s) return '';
+    const tip = s.read.length ? s.read[0] : 'Street score';
+    return `<span class="score" title="Street score. ${esc(tip)}" style="color:var(--muted);font-weight:500;white-space:nowrap">Street ${Math.round(s.score.total)}</span>`;
+  }
+
+  function drawHist(t) {
+    const cv = $('#hist');
+    if (!cv || !cv.clientWidth) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    cv.width = w * dpr; cv.height = h * dpr;
+    const ctx = cv.getContext('2d');
+    ctx.scale(dpr, dpr);
+    const H = t.histogram;
+    const inner = a => a.slice(1, 255);
+    const max = Math.max(...inner(H.r), ...inner(H.g), ...inner(H.b), ...inner(H.l)) || 1;
+    const y = v => h - Math.min(1, v / max) * (h - 6);
+    const area = (arr, color) => {
+      ctx.beginPath(); ctx.moveTo(0, h);
+      arr.forEach((v, i) => ctx.lineTo(i / 255 * w, y(v)));
+      ctx.lineTo(w, h); ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+    };
+    ctx.globalCompositeOperation = 'lighter';
+    area(H.r, 'rgba(255,70,70,.55)'); area(H.g, 'rgba(70,220,90,.55)'); area(H.b, 'rgba(70,120,255,.6)');
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.beginPath(); H.l.forEach((v, i) => i ? ctx.lineTo(i / 255 * w, y(v)) : ctx.moveTo(0, y(v)));
+    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.2; ctx.stroke();
+    // Clipping indicators
+    if (t.highlightClipAny >= 0.1) { ctx.fillStyle = 'var(--bad)'; ctx.fillStyle = '#ff6159'; ctx.fillRect(w - 4, 0, 4, h); }
+    if (t.shadowClip >= 0.1) { ctx.fillStyle = '#4c9dff'; ctx.fillRect(0, 0, 4, h); }
+  }
+
+  function drawZones(t) {
+    const max = Math.max(...t.zones) || 1;
+    $('#zones').innerHTML = t.zones.map((v, i) => {
+      const g = Math.round(Math.pow(i / 10, 1 / 1.6) * 230 + 12);
+      return `<div title="Zone ${i}: ${v.toFixed(1)}%" style="height:${Math.max(2, v / max * 100)}%;background:rgb(${g},${g},${g})"></div>`;
+    }).join('');
+  }
+
+  // ---------- Editor ----------
+  const FILMS_DEFAULT = [
+    ['Kodak/Kodak Kodachrome 64.png', 'Kodachrome 64'], ['Kodak/Kodak Kodachrome 200.png', 'Kodachrome 200'],
+    ['Kodak/Kodak Ektachrome 100 VS.png', 'Ektachrome 100 VS'], ['Kodak/Kodak Ektar 100.png', 'Ektar 100'],
+    ['Kodak/Kodak Portra 400 2.png', 'Portra 400'], ['Kodak/Kodak Portra 400 VC 2.png', 'Portra 400 VC'],
+    ['Kodak/Kodak Portra 800 2.png', 'Portra 800'], ['Fuji/Fuji Superia 400 2.png', 'Superia 400'], ['Fuji/Fuji 400H 2.png', 'Fuji 400H'],
+  ];
+  let films = FILMS_DEFAULT;
+  let originals = 'ok';   // from /api/ping: can the server read the original files?
+  // Export settings (per shoot, saved by the server): frame + destination.
+  const exp = { settings: { frame: true, side: 3, topBottom: 2, color: '#FFFFFF', dest: '' }, dest: '', defaultDest: '' };
+  let expTimer = null;
+  state.framePreview = false;
+  function toggleFramePreview() {
+    state.framePreview = !state.framePreview;
+    if (state.framePreview && !exp.settings.frame) { exp.settings.frame = true; syncExport(); saveExport(); }
+    refit();
+  }
+  $('#frameBtn').addEventListener('click', toggleFramePreview);
+  const num = (d, unit = '') => v => (v > 0 ? '+' : '') + Number(v).toFixed(d) + unit;
+  const plain = v => String(Math.round(v));
+  const GROUPS = [
+    ['Light', [
+      { k: 'exposure', label: 'Exposure', min: -2, max: 2, step: 0.05, fmt: num(2, ' EV') },
+      { k: 'contrast', label: 'Contrast', min: 0, max: 100, step: 1, fmt: plain },
+      { k: 'highlights', label: 'Highlights', min: 0, max: 100, step: 1, fmt: plain },
+      { k: 'shadows', label: 'Shadows', min: 0, max: 100, step: 1, fmt: plain },
+      { k: 'blacks', label: 'Blacks', min: -50, max: 50, step: 1, fmt: num(0) },
+    ]],
+    ['Presence', [
+      { k: 'punch', label: 'Punch', min: 0, max: 100, step: 1, fmt: plain },
+      { k: 'vibrance', label: 'Vibrance', min: -100, max: 100, step: 1, fmt: num(0) },
+      { k: 'saturation', label: 'Saturation', min: -100, max: 100, step: 1, fmt: num(0) },
+    ]],
+    ['Color', [
+      { k: 'warmth', label: 'Warmth', min: -50, max: 50, step: 1, fmt: num(0) },
+      { k: 'tint', label: 'Tint', min: -50, max: 50, step: 1, fmt: num(0) },
+    ]],
+    ['Film', [
+      { k: 'film', label: 'Stock', select: true },
+      { k: 'filmStrength', label: 'Strength', min: 0, max: 100, step: 1, fmt: v => Math.round(v) + '%' },
+    ]],
+    ['Effects', [{ k: 'vignette', label: 'Vignette', min: 0, max: 100, step: 1, fmt: plain }]],
+    ['Geometry', [{ k: 'rotate', label: 'Straighten', min: -10, max: 10, step: 0.1, fmt: v => (v > 0 ? '+' : '') + Number(v).toFixed(1) + '°' }]],
+    ['Detail', [{ k: 'sharpen', label: 'Sharpen', min: 0, max: 100, step: 1, fmt: plain }]],
+  ];
+  const CTL = Object.fromEntries(GROUPS.flatMap(g => g[1]).map(c => [c.k, c]));
+  const NEUTRAL = { exposure: 0, contrast: 0, highlights: 0, shadows: 0, blacks: 0, punch: 0, vibrance: 0, saturation: 0, warmth: 0, tint: 0, film: '', filmStrength: 0, vignette: 0, rotate: 0, sharpen: 0 };
+  const norm = q => ({ ...NEUTRAL, ...(q || {}) });
+  const same = (a, b) => Object.keys(NEUTRAL).every(k => k === 'film' ? (a[k] || '') === (b[k] || '') : Math.abs(a[k] - b[k]) < 1e-6);
+
+  // ed: the photo being edited. cur = slider state, shown = params of the image on screen,
+  // rec = recommendation, seq = id of the newest render request.
+  let ed = null;
+  let renderTimer = null;
+
+  function setTab(tab) {
+    state.tab = tab;
+    document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
+    $('#pane-edit').hidden = tab !== 'edit';
+    $('#pane-analysis').hidden = tab !== 'analysis';
+    if (tab === 'analysis' && state.index >= 0) drawHist(byId[state.order[state.index]].tone);
+  }
+  document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+
+  function setStatus(text, cls = '') {
+    const el = $('#edStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'ed-status' + (cls ? ' ' + cls : '');
+  }
+
+  function controlHTML(c) {
+    if (c.select) {
+      return `<div class="ctl" data-k="film"><label for="c-film">${esc(c.label)}</label><output id="o-film"></output>
+        <select id="c-film"><option value="">None</option>${films.map(([path, name]) => `<option value="${esc(path)}">${esc(name)}</option>`).join('')}</select></div>`;
+    }
+    return `<div class="ctl" data-k="${c.k}"><label for="c-${c.k}">${esc(c.label)}</label><output id="o-${c.k}" for="c-${c.k}"></output>
+      <div class="track"><input type="range" id="c-${c.k}" min="${c.min}" max="${c.max}" step="${c.step}" title="Double-click to reset to the recommended value"><i class="rec" id="r-${c.k}"></i></div></div>`;
+  }
+
+  function openEditor(p) {
+    clearTimeout(renderTimer); renderTimer = null;
+    const e = p.edit || {};
+    ed = { id: p.id, p, cur: norm(e.params || e.recommended), rec: norm(e.recommended || e.params), shown: norm(e.params || e.recommended), seq: 0, inflight: 0, steps: e.steps || [] };
+    const steps = ed.steps.map(st => `<div class="st"><b>${esc(st.tool)}</b> <span class="v">${esc(st.setting)}</span><p>${esc(st.reason)}</p></div>`).join('');
+    $('#pane-edit').innerHTML = `
+      <section class="sec">
+        <div class="ed-top">
+          <div class="title"><b>${esc(e.look || 'Edit')}</b> <span class="pill" id="edPill"></span></div>
+          <button class="iconbtn" id="edReset" title="Set every slider back to the recommendation">Reset to recommended</button>
+          <button class="iconbtn primary" id="edExport" title="Full-resolution JPEG, quality 95">Export full size</button>
+        </div>
+        <div class="ed-status" id="edStatus" role="status" aria-live="polite"></div>
+        ${server === false ? `<div class="ed-off">Editing needs the local server: run <code>photolab serve &lt;report-dir&gt;</code> and open <code>http://127.0.0.1:8765/index.html</code>. This static view only shows the saved edits.</div>` : ''}
+        ${server && originals !== 'ok' ? `<div class="ed-off">The server can't read your original files yet${originals === 'waiting' ? ' (macOS is waiting for you to allow access to their folder)' : ' (macOS denied access to their folder)'}. Previews and edits work; full-size export needs that access, or start <code>photolab serve</code> from Terminal.</div>` : ''}
+        ${e.userModified ? '<div class="ed-off">This sidecar was changed in RawTherapee. The preview shows that version; moving a slider here replaces it.</div>' : ''}
+      </section>
+      ${GROUPS.map(([name, ctls]) => `<section class="ed-group"><h3>${esc(name)}</h3>${ctls.map(controlHTML).join('')}</section>`).join('')}
+      <section class="ed-group" id="exportSec"><h3>Export</h3>
+        <label class="chk"><input type="checkbox" id="x-frame"> White frame <span class="muted">(preview with B)</span></label>
+        <div class="ctl"><label for="x-side">Left / right</label><output id="xo-side"></output>
+          <div class="track"><input type="range" id="x-side" min="0" max="10" step="0.5"></div></div>
+        <div class="ctl"><label for="x-tb">Top / bottom</label><output id="xo-tb"></output>
+          <div class="track"><input type="range" id="x-tb" min="0" max="10" step="0.5"></div></div>
+        <label class="lbl" for="x-dest">Save to</label>
+        <input type="text" id="x-dest" spellcheck="false" autocomplete="off" title="Folder for full-size exports (Enter to apply). Never the originals' folder.">
+        <p class="note" id="x-note">Widths are % of the photo's long edge. Full size, JPEG quality 95.</p>
+      </section>
+      <section class="sec">
+        <details class="why" open><summary>Why these settings</summary><div class="steps">${steps || '<span class="muted">No recommendation recorded.</span>'}</div></details>
+        <p class="note">Double-click a slider to return it to the recommendation (the small tick). Arrow keys nudge the focused slider. Edits save as you go and also open in RawTherapee:</p>
+        ${e.workspace ? `<code class="path">open -a RawTherapee "${esc(e.workspace)}"</code>` : ''}
+      </section>`;
+    for (const c of Object.values(CTL)) {
+      const el = $('#c-' + c.k);
+      if (c.select) {
+        el.addEventListener('change', () => { ed.cur.film = el.value; if (el.value && !ed.cur.filmStrength) ed.cur.filmStrength = 70; syncControls(); changed(); });
+        continue;
+      }
+      el.addEventListener('input', () => { ed.cur[c.k] = parseFloat(el.value); syncControl(c.k); applyApprox(); changed(); });
+      el.addEventListener('dblclick', () => { ed.cur[c.k] = ed.rec[c.k]; syncControl(c.k); applyApprox(); changed(true); });
+    }
+    $('#edReset').addEventListener('click', resetEdit);
+    $('#edExport').addEventListener('click', exportOne);
+    $('#x-frame').addEventListener('change', () => { exp.settings.frame = $('#x-frame').checked; if (!exp.settings.frame) state.framePreview = false; syncExport(); refit(); saveExport(); });
+    $('#x-side').addEventListener('input', () => { exp.settings.side = parseFloat($('#x-side').value); syncExport(); refit(); saveExport(); });
+    $('#x-tb').addEventListener('input', () => { exp.settings.topBottom = parseFloat($('#x-tb').value); syncExport(); refit(); saveExport(); });
+    $('#x-dest').addEventListener('change', () => {
+      const v = $('#x-dest').value.trim();
+      exp.settings.dest = !v || v === exp.defaultDest ? '' : v;
+      saveExport(true);
+    });
+    $('#x-dest').addEventListener('keydown', ev => { if (ev.key === 'Enter') ev.target.blur(); });
+    syncExport();
+    syncControls();
+    setEnabled(server !== false);
+    syncExport();
+    setStatus(server === false ? '' : e.modified ? 'Your edit' : 'Recommended edit');
+    if (server) refreshFromServer(p.id);
+  }
+
+  function setEnabled(on) {
+    $('#pane-edit').querySelectorAll('input, select, #edReset, #edExport').forEach(el => { el.disabled = !on; });
+  }
+
+  function syncExport() {
+    const f = exp.settings;
+    if (!$('#x-frame')) return;
+    $('#x-frame').checked = f.frame;
+    $('#x-side').value = f.side; $('#x-tb').value = f.topBottom;
+    $('#xo-side').textContent = f.side.toFixed(1) + '%';
+    $('#xo-tb').textContent = f.topBottom.toFixed(1) + '%';
+    $('#x-side').disabled = $('#x-tb').disabled = !server || !f.frame;
+    if (document.activeElement !== $('#x-dest')) $('#x-dest').value = exp.dest || f.dest || exp.defaultDest;
+  }
+
+  // Save export settings (debounced for sliders). The server validates the destination.
+  function saveExport(now = false) {
+    if (!server) return;
+    clearTimeout(expTimer);
+    expTimer = setTimeout(async () => {
+      try {
+        const j = await post('api/export-settings', { settings: exp.settings });
+        exp.settings = j.settings; exp.dest = j.dest || ''; exp.defaultDest = j.defaultDest || exp.defaultDest;
+        syncExport();
+        if (now) setStatus('Exports will be saved to ' + exp.dest, 'ok');
+      } catch (err) {
+        setStatus('Destination not accepted: ' + err.message, 'err');
+        await loadExport();
+      }
+    }, now ? 0 : 400);
+  }
+  async function loadExport() {
+    try {
+      const r = await fetch('api/export-settings', { cache: 'no-store' });
+      const j = await r.json();
+      exp.settings = j.settings; exp.dest = j.dest || ''; exp.defaultDest = j.defaultDest || '';
+      syncExport(); refit();
+    } catch (_) {}
+  }
+
+  function syncControl(k) {
+    const c = CTL[k], el = $('#c-' + k), out = $('#o-' + k);
+    if (!el) return;
+    const v = ed.cur[k];
+    if (c.select) {
+      if (![...el.options].some(o => o.value === v)) el.insertAdjacentHTML('beforeend', `<option value="${esc(v)}">${esc(v.split('/').pop().replace(/\.png$/, ''))}</option>`);
+      el.value = v;
+      out.textContent = v === ed.rec.film ? '' : 'changed';
+    } else {
+      if (parseFloat(el.value) !== v) el.value = v;
+      out.textContent = c.fmt(v);
+      const frac = (ed.rec[k] - c.min) / (c.max - c.min);
+      const r = $('#r-' + k);
+      r.style.left = `calc(7px + (100% - 14px) * ${Math.min(1, Math.max(0, frac))})`;
+      r.title = 'Recommended: ' + c.fmt(ed.rec[k]);
+    }
+    el.closest('.ctl').classList.toggle('changed', c.select ? v !== ed.rec.film : Math.abs(v - ed.rec[k]) > 1e-6);
+  }
+  function syncControls() {
+    Object.keys(CTL).forEach(syncControl);
+    const isRec = same(ed.cur, ed.rec);
+    $('#edPill').textContent = isRec ? 'recommended' : 'edited';
+    $('#edPill').className = 'pill' + (isRec ? '' : ' mine');
+  }
+
+  // Instant, approximate feedback while the real render runs: CSS filters + a transform relative to
+  // the params of the image on screen. Cleared as soon as the real render arrives.
+  function applyApprox() {
+    const img = $('#mainimg'), vig = $('#vigapprox');
+    if (!ed || state.ba !== 'edit' || !editPreview(ed.p)) { img.style.filter = ''; img.style.transform = ''; vig.style.opacity = 0; return; }
+    const a = ed.cur, b = ed.shown, d = k => a[k] - b[k];
+    const bright = Math.pow(2, d('exposure') * 0.75) * (1 + d('shadows') * 0.0025 - d('highlights') * 0.0012 + d('blacks') * 0.002);
+    const contrast = 1 + d('contrast') * 0.006 - d('blacks') * 0.006 + d('punch') * 0.002 + d('filmStrength') * 0.0015;
+    const sat = Math.max(0, 1 + d('saturation') * 0.01 + d('vibrance') * 0.006 + d('filmStrength') * 0.003);
+    // Warmth/tint as channel gains (0.3 Lab units per slider step).
+    const w = d('warmth') * 0.3, t = d('tint') * 0.3;
+    const rG = 1 + w * 0.006 + t * 0.005, gG = 1 - t * 0.008, bG = 1 - w * 0.014 + t * 0.003;
+    $('#wbmatrix').setAttribute('values', `${rG} 0 0 0 0  0 ${gG} 0 0 0  0 0 ${bG} 0 0  0 0 0 1 0`);
+    const parts = [];
+    if (w || t) parts.push('url(#wbapprox)');
+    if (Math.abs(bright - 1) > 1e-3) parts.push(`brightness(${bright.toFixed(3)})`);
+    if (Math.abs(contrast - 1) > 1e-3) parts.push(`contrast(${contrast.toFixed(3)})`);
+    if (Math.abs(sat - 1) > 1e-3) parts.push(`saturate(${sat.toFixed(3)})`);
+    img.style.filter = parts.join(' ');
+    const rot = d('rotate');
+    if (Math.abs(rot) > 1e-6) {
+      const th = Math.abs(rot) * Math.PI / 180, W = ed.p.width, H = ed.p.height;
+      const sc = Math.max((W * Math.cos(th) + H * Math.sin(th)) / W, (W * Math.sin(th) + H * Math.cos(th)) / H);
+      img.style.transform = `rotate(${-rot}deg) scale(${sc.toFixed(4)})`;   // RawTherapee: + = counter-clockwise
+    } else img.style.transform = '';
+    vig.style.opacity = Math.max(0, Math.min(1, d('vignette') / 100));
+  }
+
+  function changed(now = false) {
+    syncControls();
+    if (!server) return;
+    setStatus('Rendering…');
+    clearTimeout(renderTimer);
+    renderTimer = setTimeout(sendRender, now ? 0 : 350);
+  }
+  // Leaving a photo with a pending change: send it now so nothing is lost.
+  function flushRender() { if (renderTimer && ed && server) { clearTimeout(renderTimer); sendRender(); } }
+
+  async function post(url, body) {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : '{}' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    return j;
+  }
+
+  function sendRender() {
+    renderTimer = null;
+    if (!ed) return;
+    request(ed, `api/photo/${encodeURIComponent(ed.id)}/render`, { params: { ...ed.cur } });
+  }
+  function resetEdit() {
+    if (!ed) return;
+    clearTimeout(renderTimer); renderTimer = null;
+    ed.cur = { ...ed.rec };
+    syncControls(); applyApprox();
+    request(ed, `api/photo/${encodeURIComponent(ed.id)}/reset`, null);
+  }
+
+  // Latest request wins on screen: an older response never replaces a newer one.
+  async function request(e, url, body) {
+    const seq = ++e.seq;
+    e.inflight++;
+    $('#busy').hidden = false;
+    setStatus('Rendering…');
+    const t0 = performance.now();
+    try {
+      const j = await post(url, body);
+      applyResult(e.p, j);
+      if (seq !== e.seq || j.stale) return;
+      if (ed === e) await swapImage(e, j, seq, Math.round(performance.now() - t0));
+    } catch (err) {
+      if (seq === e.seq && ed === e) setStatus('Could not render: ' + err.message, 'err');
+    } finally {
+      e.inflight--;
+      if (ed === e && !e.inflight) $('#busy').hidden = true;
+    }
+  }
+
+  // Store the server's answer in the report data and refresh the grid card.
+  function applyResult(p, j) {
+    p.edit = p.edit || {};
+    if (j.params) p.edit.params = j.params;
+    if (j.recommended) p.edit.recommended = j.recommended;
+    if (j.preview) p.edit.preview = j.preview.split('?')[0];
+    if (j.thumb) p.edit.thumb = j.thumb.split('?')[0];
+    if (j.version != null) p.edit.version = j.version;
+    if (j.modified != null) p.edit.modified = j.modified;
+    if (j.userModified != null) p.edit.userModified = j.userModified;
+    const card = document.querySelector(`.card[data-id="${CSS.escape(p.id)}"] img`);
+    if (card && state.show === 'edit' && editThumb(p) && card.getAttribute('src') !== editThumb(p)) card.src = editThumb(p);
+  }
+
+  function swapImage(e, j, seq, ms) {
+    return new Promise(resolve => {
+      const url = editPreview(e.p);
+      const pre = new Image();
+      pre.onload = pre.onerror = () => {
+        if (ed !== e || seq !== e.seq) return resolve();
+        e.shown = norm(j.params);
+        if (state.ba === 'edit') $('#mainimg').src = url;
+        applyApprox();   // keeps only the part of the approximation for changes made after this request
+        if (!renderTimer) setStatus(`Saved · rendered in ${(ms / 1000).toFixed(1)} s`, 'ok');
+        resolve();
+      };
+      pre.src = url;
+    });
+  }
+
+  async function refreshFromServer(id) {
+    try {
+      const r = await fetch(`api/photo/${encodeURIComponent(id)}`, { cache: 'no-store' });
+      if (!r.ok) return;
+      const j = await r.json();
+      const p = byId[id];
+      p.edit = p.edit || {};
+      if (j.steps) p.edit.steps = j.steps;
+      applyResult(p, j);
+      if (!ed || ed.id !== id || ed.seq || renderTimer) return;   // already editing: keep the sliders
+      ed.rec = norm(j.recommended); ed.cur = norm(j.params); ed.shown = norm(j.params);
+      syncControls(); applyApprox();
+      if (state.ba === 'edit' && editPreview(p) && $('#mainimg').getAttribute('src') !== editPreview(p)) $('#mainimg').src = editPreview(p);
+    } catch (_) { /* keep report data */ }
+  }
+
+  async function exportOne() {
+    if (!ed) return;
+    flushRender();
+    const e = ed, btn = $('#edExport');
+    btn.disabled = true;
+    setStatus('Exporting full size…');
+    try {
+      clearTimeout(expTimer);
+      const j = await post(`api/photo/${encodeURIComponent(e.id)}/export`, { settings: exp.settings });
+      if (ed === e) setStatus(`Saved ${j.width}×${j.height}${j.frame ? ' with frame' : ''} → ${j.path}`, 'ok');
+    } catch (err) {
+      if (ed === e) setStatus('Export failed: ' + err.message, 'err');
+    } finally { btn.disabled = false; }
+  }
+
+  $('#exportAll').addEventListener('click', async () => {
+    const btn = $('#exportAll'), st = $('#exportAllStatus');
+    btn.disabled = true; st.textContent = `Exporting ${R.photos.length} photos…`;
+    try {
+      clearTimeout(expTimer);
+      const j = await post('api/export-all', { settings: exp.settings });
+      st.textContent = `Saved ${j.count} to ${j.dir}${j.failed && j.failed.length ? ` (${j.failed.length} failed: ${j.error || ''})` : ''}`;
+    } catch (err) { st.textContent = 'Export failed: ' + err.message; }
+    finally { btn.disabled = false; }
+  });
+
+  // Is the editing server there? (Not when the report is opened as a file.)
+  (async () => {
+    try {
+      if (location.protocol === 'file:') throw new Error('file');
+      const ctl = new AbortController();
+      setTimeout(() => ctl.abort(), 2500);
+      const r = await fetch('api/ping', { cache: 'no-store', signal: ctl.signal });
+      const j = await r.json();
+      if (!j.ok) throw new Error('no');
+      server = true;
+      if (j.films && j.films.length) films = j.films.map(f => [f.path, f.name]);
+      if (j.originals) originals = j.originals;
+    } catch (_) { server = false; }
+    $('#exportAll').hidden = !server;
+    if (server) await loadExport();
+    if (ed && !ed.seq) openEditor(ed.p);
+  })();
+
+  renderGrid();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,189 @@
+[
+  {
+    "id": "20261122-1900",
+    "items": [
+      "Collections: your own bodies of work from any shoots. Press B to add the selection (or right-click, or drag onto a collection in the sidebar); drag to reorder, Delete to take a photo out",
+      "Export a collection or Best Work to a new folder (on the Desktop, named after it), with or without a frame; project screens no longer have an Export button",
+      "Best Work and All Selects show which collection each photo is in",
+      "Colour Balance in the editor: separate warmth and tint for the shadows and the highlights, for casts that differ by tone (film scans: blue-green shadows, pink highlights). Neutralize measures the cast and cancels it",
+      "Marks are the same everywhere: a Select carries its circle and Best Work its star in projects, All Selects, Best Work, collections, the loupe and the editor, in one style",
+      "Settings (⌘, or the bottom of the sidebar): turn photo analysis on or off, connect Claude Code or an Anthropic or OpenAI API key, and choose your panel",
+      "Choose a panel by style (New York Street, Colour Masters, Black-and-White Street, Documentary and Portrait, Quiet and Precise, Wit and the Absurd), or pick your own from 36 photographers",
+      "New libraries start with a short introduction; photo analysis is optional, and when it's off the Analysis button doesn't appear",
+      "Ilford HP5 Plus 400 joins the films",
+      "The sidebar follows your folders: folders first, then loose shoots; month and year folders fold away, and the one you're in opens itself",
+      "Film scans print their real camera and film on the edge, read from the roll folder (\"Roll 1 - Portra 400 - M6\" → LEICA M6 · PORTRA 400), not the scanner",
+      "The editor's section lines run edge to edge; its scrollbar floats over the panel while you scroll",
+      "Project covers sit inside their frame on all four sides (a taller photo ran out through the bottom)",
+      "Sidebar names and counts sit on one baseline"
+    ]
+  },
+  {
+    "id": "20261122-1800",
+    "items": [
+      "A new app icon: a 35 mm film frame on Baseline orange; the sidebar shows the name, Darkroom",
+      "The Export buttons are outline buttons, like Attach Folder"
+    ]
+  },
+  {
+    "id": "20261122-1700",
+    "items": [
+      "Edits apply faster: while you adjust, the preview renders at a lighter size, and the full-detail render follows a moment after you stop",
+      "Cleaner film strips: smaller sprocket holes, the edge print clear of the photo, and no panel behind the strips"
+    ]
+  },
+  {
+    "id": "20261122-1600",
+    "items": [
+      "The film edge print finds your camera even when an export dropped it, from the original file beside it (e.g. the RAF next to a Capture One export); iCloud-only files are never downloaded for this",
+      "Photos whose edited preview was cleared when the disk was full get it back in the background, so they open without waiting"
+    ]
+  },
+  {
+    "id": "20261122-1500",
+    "items": [
+      "Projects open as the contact sheet only; All Selects and Best Work keep the grid",
+      "The film edge print reads each photo's own camera from its EXIF (and the film simulation on a Fuji)",
+      "The edit panel no longer changes width when a section opens or a photo loads"
+    ]
+  },
+  {
+    "id": "20261122-1400",
+    "items": [
+      "PhotoLab is now Baseline Darkroom: same library, edits, marks and My Look, moved to the new name automatically",
+      "A new look in Baseline's design: Satoshi and Geist type, Baseline orange for primary actions and focus, framed panels"
+    ]
+  },
+  {
+    "id": "20261109-1915",
+    "items": [
+      "No more flashing or going black while Baseline Darkroom sits in the background: it only reloads after a real restart, and only when you come back to it"
+    ]
+  },
+  {
+    "id": "20261109-1720",
+    "items": [
+      "The update notice now only appears for real updates"
+    ]
+  },
+  {
+    "id": "20261109-1710",
+    "items": [
+      "Critique judges every photo by your own standard and what made the panel's work great"
+    ]
+  },
+  {
+    "id": "20261109-1650",
+    "items": [
+      "Favorite star: a simple five-point star, filled in"
+    ]
+  },
+  {
+    "id": "20261109-1633",
+    "items": [
+      "Before/after: drag the divider to compare the original and your edit"
+    ]
+  },
+  {
+    "id": "20261109-1623",
+    "items": [
+      "Sort projects, or drag them into your own order"
+    ]
+  },
+  {
+    "id": "20261109-1616",
+    "items": [
+      "Cleaner grease-pencil circle and star; no jitter or white boxes"
+    ]
+  },
+  {
+    "id": "20261109-1615",
+    "items": [
+      "New Analysis: press A to see the photo beside a critique from your panel",
+      "Every problem comes with a fix you can apply",
+      "Panel tab: the six photographers your work is judged against"
+    ]
+  },
+  {
+    "id": "20261109-1558",
+    "items": [
+      "No marks in Selects and Best Work",
+      "One star everywhere",
+      "Film strips are the default view",
+      "Cleaner library header"
+    ]
+  },
+  {
+    "id": "20261109-1413",
+    "items": [
+      "Claude critiques only use your personal account"
+    ]
+  },
+  {
+    "id": "20261109-1139",
+    "items": [
+      "Analysis by Claude: press A for a critique of the photo"
+    ]
+  },
+  {
+    "id": "20261109-1014",
+    "items": [
+      "Analysis on the photo: press A for a short read of the frame",
+      "Analysis lists things worth a second look: signs, echoes, colour rhymes"
+    ]
+  },
+  {
+    "id": "20261109-0942",
+    "items": [
+      "Mark buttons always in the same order: pick, favorite, reject"
+    ]
+  },
+  {
+    "id": "20261109-0935",
+    "items": [
+      "My Look now learns from your favorites: edit your Best Work and unedited photos follow"
+    ]
+  },
+  {
+    "id": "20261109-0934",
+    "items": [
+      "Update notes show what changed before you reload"
+    ]
+  },
+  {
+    "id": "20261109-0930",
+    "items": [
+      "Best tags removed from photos; bursts keep their line"
+    ]
+  },
+  {
+    "id": "20261107-1808",
+    "items": [
+      "Project menu on All Selects and Best Work",
+      "Bold marks restored inside projects",
+      "Section headers aligned"
+    ]
+  },
+  {
+    "id": "20261107-1802",
+    "items": [
+      "All Selects and Best Work look like project galleries",
+      "Calmer marks on All Selects; none on Best Work",
+      "Copy tightened across the app"
+    ]
+  },
+  {
+    "id": "20261107-1738",
+    "items": [
+      "Contact sheet is dark only"
+    ]
+  },
+  {
+    "id": "20261107-1631",
+    "items": [
+      "Smoother preview while editing",
+      "Less flicker in the app",
+      "Thumbnails can no longer go missing"
+    ]
+  }
+]

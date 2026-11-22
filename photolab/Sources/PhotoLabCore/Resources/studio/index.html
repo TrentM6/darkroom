@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en" class="preload">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Darkroom</title>
+<link rel="preload" href="fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="styles.css" id="css">
+</head>
+<body>
+<div id="app">
+
+  <!-- Sidebar (library + grids) -->
+  <nav class="side" id="side" hidden>
+    <div class="side-top"><span class="brand">Darkroom</span></div>
+    <div class="side-list">
+      <button class="side-item" data-nav="projects"><span class="ic swap"><span class="i-off" data-icon="grid"></span><span class="i-on" data-icon="gridFill"></span></span><span class="t">Projects</span><span class="n" id="nProjects"></span></button>
+      <button class="side-item" data-nav="selects"><span class="ic gl" data-glyph="pick"></span><span class="t">All Selects</span><span class="n" id="nSelects"></span></button>
+      <button class="side-item" data-nav="best"><span class="ic gl" data-glyph="favorite"></span><span class="t">Best Work</span><span class="n" id="nBest"></span></button>
+    </div>
+    <div class="side-cols" id="sideCols"></div>
+    <div class="side-list side-projects" id="sideProjects"></div>
+    <div class="side-note" id="sideNote" role="status" hidden></div>
+    <div class="side-list side-foot"><button class="side-item" id="settingsBtn" title="Settings (⌘,)"><span class="ic" data-icon="settings"></span><span class="t">Settings</span></button></div>
+  </nav>
+
+  <!-- Library -->
+  <section id="v-library" class="view with-side" hidden>
+    <header class="bar">
+      <div class="title">Projects</div>
+      <div class="grow"></div>
+      <div class="lib-sortslot" id="libSortSlot" hidden></div>
+      <button class="btn" id="attachBtn" title="Attach Folder (⌘O)"><span class="ic" data-icon="folderPlus"></span>Attach Folder</button>
+    </header>
+    <main class="lib-scroll" id="libScroll">
+      <div class="lib-grid" id="libGrid"></div>
+      <div class="lib-empty" id="libEmpty" hidden>
+        <button class="btn primary big" id="attachBtn2"><span class="ic" data-icon="folder"></span>Attach Folder</button>
+      </div>
+    </main>
+  </section>
+
+  <!-- Project grid -->
+  <section id="v-grid" class="view with-side" hidden>
+    <header class="bar">
+      <div class="title" id="gridTitle"></div>
+      <div class="grow"></div>
+      <div class="seg" id="filterSeg" role="radiogroup" aria-label="Filter">
+        <button data-v="all">All</button>
+        <button data-v="selects">Selects</button>
+        <button data-v="favorites">Favorites</button>
+        <button data-v="unflagged">Unflagged</button>
+        <button data-v="rejected">Rejected</button>
+      </div>
+      <select class="pfilter" id="pfilterSel" aria-label="Project" hidden></select>
+      <div class="seg icons" id="viewSeg" role="radiogroup" aria-label="View">
+        <button data-v="grid" title="Grid (C)"><span class="ic" data-icon="grid"></span></button>
+        <button data-v="sheet" title="Contact Sheet (C)"><span class="ic" data-icon="film"></span></button>
+      </div>
+      <div class="grow"></div>
+      <label class="size" title="Thumbnail size"><input type="range" id="thumbSize" min="110" max="360" step="1" aria-label="Thumbnail size"></label>
+      <button class="btn" id="gridExport"><span class="ic" data-icon="export"></span>Export</button>
+    </header>
+    <div class="missing-banner" id="missingBanner" role="status" hidden><span>Folder missing</span><button class="btn" id="missingLocate">Locate…</button></div>
+    <main class="grid-scroll" id="gridScroll" tabindex="-1">
+      <div id="gridBody"></div>
+      <div class="grid-empty" id="gridEmpty" hidden></div>
+    </main>
+  </section>
+
+  <!-- Edit -->
+  <section id="v-edit" class="view" hidden>
+    <header class="bar">
+      <button class="btn ghost back" id="editBack" title="Back to grid (G)"><span class="ic" data-icon="back"></span><span id="editBackName"></span></button>
+      <div class="grow"></div>
+      <div class="filename" id="editName"></div>
+      <div class="grow"></div>
+      <button class="tool" id="beforeBtn" title="Before / after (\, hold for before)" aria-pressed="false"><span class="ic" data-icon="before"></span></button>
+      <button class="tool" id="frameBtn" title="White frame (B)"><span class="ic" data-icon="frame"></span></button>
+      <button class="tool" id="cropBtn" title="Crop (R)"><span class="ic" data-icon="crop"></span></button>
+      <span class="sep"></span>
+      <button class="btn" id="editExport"><span class="ic" data-icon="export"></span>Export</button>
+    </header>
+    <div class="edit-body">
+      <div class="edit-main" id="editMain">
+        <div class="edit-canvas">
+        <div class="stage" id="stage">
+          <div class="busy" id="busy"></div>
+          <div class="frame" id="frame">
+            <div class="cropbox" id="cropBox">
+              <img id="eimg" alt="" draggable="false">
+              <img id="clipImg" alt="" draggable="false" hidden>
+              <div class="vig" id="vig"></div>
+              <div class="wait" aria-hidden="true"><span class="spin"></span></div>
+              <div class="nopreview" id="noPreview">Preview unavailable</div>
+            </div>
+          </div>
+          <div class="crop-ui" id="cropUI" hidden>
+            <div class="crop-rect" id="cropRect">
+              <i class="h nw" data-h="nw"></i><i class="h ne" data-h="ne"></i><i class="h sw" data-h="sw"></i><i class="h se" data-h="se"></i>
+              <i class="third v1"></i><i class="third v2"></i><i class="third h1"></i><i class="third h2"></i>
+            </div>
+          </div>
+          <div class="split" id="split" hidden>
+            <div class="split-mask" id="splitMask"></div>
+            <div class="split-orig" id="splitOrig"><img id="origImg" alt="" draggable="false"></div>
+            <div class="split-bar" id="splitBar"><button class="split-grip" id="splitGrip" role="slider" aria-label="Divider between before and after" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"></button></div>
+            <span class="split-lab" id="splitL">Before</span><span class="split-lab" id="splitR">After</span>
+          </div>
+          <div class="stage-label" id="stageLabel" hidden>Before</div>
+          <div class="cropbar" id="cropBar" hidden></div>
+        </div>
+        <div class="under">
+          <div class="hints" id="hints"></div>
+          <div class="grow"></div>
+          <div class="ratebar" id="editRate"></div>
+          <button class="btn ghost crit-btn" id="critBtn" title="Analysis (A)" aria-pressed="false" hidden><span class="ic" data-icon="notes"></span>Analysis</button>
+        </div>
+        <div class="strip" id="strip"></div>
+        </div>
+      </div>
+      <aside class="panel" id="panel">
+        <div class="panel-scroll" id="panelScroll"></div>
+        <footer class="panel-foot">
+          <div class="row3">
+            <button class="btn" id="resetBtn" title="Reset to My Look">Reset</button>
+            <button class="btn" id="copyBtn" title="Copy settings (⌘C)">Copy</button>
+            <button class="btn" id="pasteBtn" title="Paste settings (⌘V)">Paste</button>
+          </div>
+        </footer>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Loupe -->
+  <div class="loupe" id="loupe" hidden>
+    <img id="loupeImg" alt="" draggable="false">
+    <div class="loupe-info" id="loupeInfo"></div>
+    <div class="ratebar loupe-rate" id="loupeRate"></div>
+  </div>
+
+  <div class="drop-veil" id="dropVeil" hidden><div>Drop folder to attach</div></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+  <div class="tip" id="tip" role="tooltip"></div>
+  <div class="menu" id="menu" hidden></div>
+  <div class="modal" id="modal" hidden><div class="dialog" id="dialog" role="dialog" aria-modal="true"></div></div>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="wbx" color-interpolation-filters="sRGB"><feColorMatrix id="wbm" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0"/></filter>
+</svg>
+
+<script>
+  // Load the UI fresh on every launch: a per-load version on every module (via an import map),
+  // so no cache can ever mix an old module with a new one.
+  (function () {
+    var v = Date.now().toString(36), base = location.href;
+    var files = ['app', 'api', 'mock', 'store', 'ui', 'icons', 'router', 'library', 'side', 'grid', 'edit', 'exporter', 'params', 'marks', 'undo', 'ratebar', 'gpu', 'look', 'updates', 'critique', 'onboarding', 'collections', 'exportsheet'];
+    var map = { imports: {} };
+    files.forEach(function (f) { var u = new URL('js/' + f + '.js', base).href; map.imports[u] = u + '?v=' + v; });
+    var im = document.createElement('script');
+    im.type = 'importmap';
+    im.textContent = JSON.stringify(map);
+    document.body.appendChild(im);
+    var m = document.createElement('script');
+    m.type = 'module';
+    m.src = 'js/app.js?v=' + v;
+    document.body.appendChild(m);
+  })();
+</script>
+</body>
+</html>

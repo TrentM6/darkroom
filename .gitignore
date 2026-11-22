@@ -1,0 +1,22 @@
+.DS_Store
+
+# Build output
+photolab/.build/
+
+# Third-party binaries and data (see README: install separately)
+photolab/bin/
+photolab/luts/
+
+# Personal photos, reports and agent working copies
+reports/
+work/*
+!work/*.md
+
+# Local tool config (absolute paths)
+.claude/
+
+# Satoshi is under the ITF Free Font License, which forbids redistribution: keep it local only.
+photolab/Sources/PhotoLabCore/Resources/studio/fonts/Satoshi-*
+
+# Release builds (scripts/release.sh)
+dist/
