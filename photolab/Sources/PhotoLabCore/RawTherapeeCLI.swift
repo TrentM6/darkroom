@@ -84,6 +84,9 @@ public enum RawTherapeeCLI {
         defer { try? fm.removeItem(at: tmp) }
         do { try fm.copyItem(at: src, to: tmp) } catch { log?("rawtherapee-cli repair: copy failed: \(error)"); return false }
         chmod(tmp.path, 0o755)
+        // A RawTherapee downloaded in a browser is quarantined, and copyItem keeps that; a quarantined copy signed
+        // ad hoc is killed by macOS on launch. The copy is Darkroom's own (RawTherapee.app is left as it is).
+        removexattr(tmp.path, "com.apple.quarantine", 0)
         let sign = Process()
         sign.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
         sign.arguments = ["--force", "--sign", "-", tmp.path]

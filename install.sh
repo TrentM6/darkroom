@@ -91,7 +91,10 @@ install_cli() {   # install_cli <destination>
   mkdir -p "$(dirname "$dest")"
   tmp="$(dirname "$dest")/.rawtherapee-cli.new"
   rm -f "$tmp"
-  cp "$RT_APP/Contents/MacOS/rawtherapee-cli" "$tmp"
+  # -X and xattr -d: a RawTherapee downloaded in a browser is quarantined, and a quarantined copy signed ad hoc is
+  # killed by macOS on launch (exit 137). The copy is Darkroom's own; RawTherapee.app itself is left as it is.
+  cp -X "$RT_APP/Contents/MacOS/rawtherapee-cli" "$tmp"
+  xattr -d com.apple.quarantine "$tmp" 2>/dev/null || true
   codesign --force --sign - "$tmp" 2>/dev/null || { rm -f "$tmp"; die "Couldn't sign the copy of rawtherapee-cli at $dest."; }
   if ! rt_runs "$tmp"; then
     rm -f "$tmp"

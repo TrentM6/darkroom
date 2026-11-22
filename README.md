@@ -128,7 +128,7 @@ photolab studio server (Swift, 127.0.0.1 only)
 
 ```bash
 photolab/scripts/release.sh
-gh release create v1.1 --notes-file photolab/scripts/release-notes.md dist/Baseline-Darkroom-macOS-arm64.zip dist/Baseline-Darkroom-macOS-arm64.zip.sha256
+gh release create v1.1.1 --notes-file photolab/scripts/release-notes.md dist/Baseline-Darkroom-macOS-arm64.zip dist/Baseline-Darkroom-macOS-arm64.zip.sha256
 ```
 
 The notes in `photolab/scripts/release-notes.md` tell people to install with the command, not the zip (a browser download is blocked by Gatekeeper). For a published release: `gh release edit <tag> --notes-file photolab/scripts/release-notes.md`.

@@ -48,7 +48,10 @@ if [ "$RELEASE" != 1 ]; then
   if ! rt_runs "$SUP/bin/rawtherapee-cli"; then
     for from in "$PKG/bin/rawtherapee-cli" /Applications/RawTherapee.app/Contents/MacOS/rawtherapee-cli; do
       [ -x "$from" ] || continue
-      cp "$from" "$SUP/bin/.rawtherapee-cli.new" && codesign --force --sign - "$SUP/bin/.rawtherapee-cli.new" 2>/dev/null || continue
+      # -X / xattr -d: a quarantined copy signed ad hoc is killed on launch (RawTherapee downloaded in a browser)
+      cp -X "$from" "$SUP/bin/.rawtherapee-cli.new" || continue
+      xattr -d com.apple.quarantine "$SUP/bin/.rawtherapee-cli.new" 2>/dev/null || true
+      codesign --force --sign - "$SUP/bin/.rawtherapee-cli.new" 2>/dev/null || continue
       if rt_runs "$SUP/bin/.rawtherapee-cli.new"; then mv -f "$SUP/bin/.rawtherapee-cli.new" "$SUP/bin/rawtherapee-cli"; echo "rawtherapee-cli: copied from $from (signed ad hoc)"; break; fi
     done
     rm -f "$SUP/bin/.rawtherapee-cli.new"
@@ -62,7 +65,7 @@ STAGE="$(mktemp -d)/Baseline Darkroom.app"
 mkdir -p "$STAGE/Contents/MacOS" "$STAGE/Contents/Resources"
 cp "$BUILD/PhotoLabApp" "$STAGE/Contents/MacOS/BaselineDarkroom"
 if [ "$RELEASE" != 1 ] && rt_runs "$SUP/bin/rawtherapee-cli"; then
-  cp "$SUP/bin/rawtherapee-cli" "$STAGE/Contents/MacOS/rawtherapee-cli"
+  cp -X "$SUP/bin/rawtherapee-cli" "$STAGE/Contents/MacOS/rawtherapee-cli"
   codesign --force --sign - "$STAGE/Contents/MacOS/rawtherapee-cli"
 fi
 rsync -a --exclude 'mock' "$SRC/Sources/PhotoLabCore/Resources/studio/" "$STAGE/Contents/Resources/studio/"
@@ -72,7 +75,7 @@ cp "$REPO_ROOT/LICENSE" "$REPO_ROOT/THIRD_PARTY_NOTICES.md" "$STAGE/Contents/Res
 # Icon
 cp "$PKG/assets/AppIcon.icns" "$STAGE/Contents/Resources/AppIcon.icns" || echo "warning: no icon" >&2
 
-VERSION="1.1"
+VERSION="1.1.1"
 BUILDNO="$(date +%Y%m%d%H%M)"
 cat > "$STAGE/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

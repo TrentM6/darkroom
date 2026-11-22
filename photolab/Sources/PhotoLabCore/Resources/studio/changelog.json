@@ -1,5 +1,11 @@
 [
   {
+    "id": "20261122-2200",
+    "items": [
+      "Installing works when RawTherapee was downloaded in a browser: Darkroom's copy of its command-line tool no longer inherits the download's quarantine, which made macOS stop it"
+    ]
+  },
+  {
     "id": "20261122-2100",
     "items": [
       "Darkroom checks that RawTherapee actually runs. If it can't, onboarding and Settings say so, and Repair makes a copy that works (previews and export no longer fail without a word)",
