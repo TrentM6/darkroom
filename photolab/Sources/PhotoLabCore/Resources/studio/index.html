@@ -6,6 +6,7 @@
 <meta name="color-scheme" content="dark">
 <title>Darkroom</title>
 <link rel="preload" href="fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="fonts/faces.css">
 <link rel="stylesheet" href="styles.css" id="css">
 </head>
 <body>
@@ -54,10 +55,6 @@
         <button data-v="rejected">Rejected</button>
       </div>
       <select class="pfilter" id="pfilterSel" aria-label="Project" hidden></select>
-      <div class="seg icons" id="viewSeg" role="radiogroup" aria-label="View">
-        <button data-v="grid" title="Grid (C)"><span class="ic" data-icon="grid"></span></button>
-        <button data-v="sheet" title="Contact Sheet (C)"><span class="ic" data-icon="film"></span></button>
-      </div>
       <div class="grow"></div>
       <label class="size" title="Thumbnail size"><input type="range" id="thumbSize" min="110" max="360" step="1" aria-label="Thumbnail size"></label>
       <button class="btn" id="gridExport"><span class="ic" data-icon="export"></span>Export</button>

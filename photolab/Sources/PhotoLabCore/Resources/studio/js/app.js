@@ -1,6 +1,6 @@
 // Baseline Darkroom: boot, routing between the three screens, global keyboard.
 import { api } from './api.js';
-import { store, loadLibrary } from './store.js';
+import { store, loadLibrary, on } from './store.js';
 import { $, isTyping, isDialogOpen, menuOpen, toast, initTooltips, hideTip, closeMenu, isApp } from './ui.js';
 import { hydrateIcons } from './icons.js';
 import { current, onRoute } from './router.js';
@@ -27,10 +27,8 @@ async function boot() {
   document.documentElement.dataset.mode = api.mode;
   initLibrary(); initSide(); initGrid(); initEdit();
   initLook(); fetchLook(); initUpdates();
-  try {
-    const lib = await loadLibrary();
-    if (lib?.engine?.error) toast(String(lib.engine.error).split(';')[0], { ms: 9000 });
-  } catch (_) { toast("Couldn't reach Darkroom"); }
+  on('library', engineWarning);
+  try { await loadLibrary(); } catch (_) { toast("Couldn't reach Darkroom"); }
   initOnboarding();
   window.studio = Object.assign(window.studio || {}, { openSettings });
   onRoute(route);
@@ -40,6 +38,19 @@ async function boot() {
   initDrop();
   // No enter animations on first load: transitions switch on after the first painted frame.
   requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove('preload')));
+}
+
+// RawTherapee missing or broken, or renders that keep failing: said once per state, with the fix in Settings.
+let engineWarned = null;
+function engineWarning(lib) {
+  const e = lib?.engine;
+  if (!e) return;
+  const state = e.problem || (e.failing >= 3 ? 'failing' : null);
+  if (state === engineWarned) return;
+  engineWarned = state;
+  if (!state) return;
+  if (e.problem) toast(String(e.error || "RawTherapee can't run").split(';')[0], { ms: 12000, action: 'Settings', onAction: () => openSettings() });
+  else toast("Photos keep failing to render. Darkroom will try them again later.", { ms: 9000 });
 }
 
 async function route(r) {

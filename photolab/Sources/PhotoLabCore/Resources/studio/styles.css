@@ -1,9 +1,9 @@
 /* Baseline Darkroom, in Baseline's design language (Baseline HQ, Baseline Playground, baselinestudio.design):
    zinc surfaces on a darker well, Satoshi text, Geist headings, one accent (Baseline orange) for focus,
    primary actions and active state. The photos and the grease pencil stay the loudest things on screen. */
-/* Satoshi (ITF Free Font License) may not be redistributed, so it is not in the repository: a private build that
-   has fonts/Satoshi-Variable.woff2 on disk uses it, every other build falls back to Geist. */
-@font-face { font-family: "Satoshi"; src: url("fonts/Satoshi-Variable.woff2") format("woff2"); font-weight: 300 900; font-display: fallback; }
+/* Satoshi (ITF Free Font License) may not be redistributed, so it is not in the repository: its @font-face is in
+   fonts/faces.css (as "Darkroom Body", so an installed Satoshi is never picked up), which is empty unless
+   fonts/Satoshi-Variable.woff2 is on disk; every other build uses Geist. */
 @font-face { font-family: "Geist"; src: url("fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: block; }
 @font-face { font-family: "Geist Mono"; src: url("fonts/GeistMono-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: block; }
 
@@ -30,7 +30,7 @@
   --ring: var(--brand-strong);
   --ring-soft: oklch(0.659 0.228 35.1 / 0.28);
 
-  --font-body: "Satoshi", "Geist", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  --font-body: "Darkroom Body", "Geist", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
   --font-heading: "Geist", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
   /* Radius scale (HQ), stepped by role so nesting reads concentrically. */
@@ -611,7 +611,7 @@ select.pfilter:focus-visible { outline: none; border-color: var(--ring); box-sha
 
 /* ---------- Overlays ---------- */
 /* Toast: radius 12 = 6 (button) + 6 (inset). Enter 200ms, exit 150ms and smaller. */
-.toasts { position: fixed; left: 50%; bottom: 24px; translate: -50% 0; display: flex; flex-direction: column-reverse; gap: 8px; z-index: 60; align-items: center; pointer-events: none; }
+.toasts { position: fixed; left: 50%; bottom: 24px; translate: -50% 0; display: flex; flex-direction: column-reverse; gap: 8px; z-index: 960; align-items: center; pointer-events: none; }
 .toast {
   pointer-events: auto; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 6px 6px 16px; border-radius: var(--r-card);
   background: var(--card); color: var(--fg); box-shadow: var(--shadow-pop); font-size: 13px;
@@ -644,7 +644,9 @@ select.pfilter:focus-visible { outline: none; border-color: var(--ring); box-sha
 .menu hr { border: 0; height: 1px; background: var(--border); margin: 4px -4px; }
 
 .modal {
-  position: fixed; inset: 0; z-index: 80; background: oklch(0.1 0.004 286 / 75%); display: flex; align-items: center; justify-content: center;
+  /* above the onboarding and Settings sheet (.onb, 900, mounted in #app too): its dialogs (Attach Folder in a
+     browser) open over it */
+  position: fixed; inset: 0; z-index: 950; background: oklch(0.1 0.004 286 / 75%); display: flex; align-items: center; justify-content: center;
   opacity: 0; transition-property: opacity; transition-duration: 150ms; transition-timing-function: ease-out;
 }
 .modal.open { opacity: 1; transition-duration: 200ms; }

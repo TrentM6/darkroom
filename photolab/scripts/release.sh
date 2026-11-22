@@ -15,7 +15,9 @@
 # rawtherapee.com. LICENSE and THIRD_PARTY_NOTICES.md go inside the app (build-app.sh).
 #
 # Publish (after checking the zip):
-#   gh release create v<version> dist/Baseline-Darkroom-macOS-arm64.zip dist/Baseline-Darkroom-macOS-arm64.zip.sha256
+#   gh release create v<version> --notes-file photolab/scripts/release-notes.md \
+#     dist/Baseline-Darkroom-macOS-arm64.zip dist/Baseline-Darkroom-macOS-arm64.zip.sha256
+# The notes say to install with the curl command: the zip, downloaded in a browser, is blocked by Gatekeeper.
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 REF="${1:-HEAD}"

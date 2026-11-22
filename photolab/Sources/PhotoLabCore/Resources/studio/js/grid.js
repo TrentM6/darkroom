@@ -1,7 +1,7 @@
 // Grid: cull with the keyboard. Used for a project (moments, bursts; or a 35mm contact sheet),
 // All Selects (grouped by project) and Best Work (manual order, drag to reorder). Includes the loupe.
 import { api, P } from './api.js';
-import { store, on, visible, setFilter, setPFilter, rate, loadContext, detail, ls, invalidate, viewMode, setViewMode, takeMarked, frameSettings } from './store.js';
+import { store, on, visible, setFilter, setPFilter, rate, loadContext, detail, ls, invalidate, takeMarked, frameSettings } from './store.js';
 import { $, $$, esc, preload, openMenu, toast, prettyDir, setImg, swapImg } from './ui.js';
 import { ICONS } from './icons.js';
 import { go, editPath, sameCtx } from './router.js';
@@ -59,27 +59,17 @@ export function initGrid() {
 
 const isActive = () => !$('#v-grid').hidden;
 const kind = () => store.ctx?.kind;
-// A project is always the contact sheet (film strips). All Selects and Best Work can switch to the grid,
-// remembered per collection.
-const viewKey = () => '@' + kind();
-const isSheet = () => !!store.ctx && (kind() === 'project' || viewMode(viewKey()) === 'sheet');
+// Everything is the contact sheet (film strips): projects, All Selects, Best Work and collections.
+const isSheet = () => !!store.ctx;
 
 function wireSegs() {
   $$('#filterSeg button').forEach(b => { b.setAttribute('role', 'radio'); b.onclick = () => { setFilter(b.dataset.v); syncSegs(); }; });
-  $$('#viewSeg button').forEach(b => { b.setAttribute('role', 'radio'); b.onclick = () => setView(b.dataset.v); });
   const pf = $('#pfilterSel');
   pf.addEventListener('change', () => { setPFilter(pf.value); pf.blur(); });
   pf.addEventListener('keydown', e => e.stopPropagation());
 }
 function syncSegs() {
   $$('#filterSeg button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.v === store.filter)));
-  const v = isSheet() ? 'sheet' : 'grid';
-  $$('#viewSeg button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.v === v)));
-}
-
-function setView(v) {
-  if (!store.ctx || kind() === 'project') return;
-  setViewMode(viewKey(), v);   // emits 'view' -> paintBar + render
 }
 
 const projectEntry = () => kind() === 'project' ? store.library?.projects?.find(x => String(x.id) === store.ctx.pid) : null;
@@ -93,7 +83,6 @@ function paintBar() {
   const k = kind();
   $('#gridTitle').textContent = store.ctx.name || '';
   $('#filterSeg').hidden = k !== 'project';
-  $('#viewSeg').hidden = k === 'project';
   // Projects export photo by photo (from the editor); collections and Best Work export as a whole.
   $('#gridExport').hidden = k === 'project';
   // All Selects and Best Work: one continuous flow, narrowed by a project picker.
@@ -584,9 +573,6 @@ export function gridKey(e) {
   if (k.startsWith('Arrow')) { e.preventDefault(); focusTo(move(k.slice(5).toLowerCase()), e.shiftKey); return true; }
   if (k === 'Home' || k === 'End') { e.preventDefault(); const v = visible(); focusTo((k === 'Home' ? v[0] : v[v.length - 1])?.key); return true; }
   if (k === ' ') { e.preventDefault(); if (store.focus) openLoupe(); return true; }
-  if (k.toLowerCase() === 'c' && !e.metaKey && !e.ctrlKey && !e.altKey && store.ctx && kind() !== 'project') {
-    e.preventDefault(); setView(isSheet() ? 'grid' : 'sheet'); return true;
-  }
   if ((k === 'Enter' || k.toLowerCase() === 'e') && !e.metaKey && !e.ctrlKey) { e.preventDefault(); if (store.focus) openEdit(store.focus); return true; }
   if ((k === 'Backspace' || k === 'Delete') && kind() === 'col' && store.sel.size) { e.preventDefault(); removeHere([...store.sel]); return true; }
   if (k === 'Escape') {

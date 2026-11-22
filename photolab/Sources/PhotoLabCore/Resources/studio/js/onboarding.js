@@ -1,7 +1,7 @@
 // Onboarding (first launch) and Settings: connect an AI, choose the critique panel, pick where My Look
 // starts, learn Selects and Best Work, attach the first folder. GET/POST /api/setup.
 import { api } from './api.js';
-import { store, on, emit } from './store.js';
+import { store, on, emit, loadLibrary } from './store.js';
 import { esc, toast } from './ui.js';
 import { attachFolder } from './library.js';
 
@@ -101,7 +101,9 @@ function mount() {
     root = document.createElement('div');
     root.className = 'onb';
     root.innerHTML = '<div class="onb-scrim"></div><div class="onb-card" role="dialog" aria-modal="true" aria-labelledby="onbTitle"></div>';
-    document.body.appendChild(root);
+    // Inside #app (position: fixed, so its own stacking context), beside #modal and #toasts: its dialogs
+    // (Attach Folder in a browser) and toasts stack above the sheet instead of under it.
+    (document.getElementById('app') || document.body).appendChild(root);
     root.addEventListener('click', onClick);
     root.addEventListener('input', onInput);
     root.addEventListener('keydown', onKeyDown);
@@ -195,11 +197,15 @@ function stepContent(id) {
     </ul>`];
   if (id === 'check') {
     const c = setup.checks, ok = c.rawTherapee && c.films;
+    const broken = !c.rawTherapee && c.rawTherapeeProblem === 'broken';
     const st = good => good ? `<span class="ok">${ic('check', 'ic xs')}Installed</span>` : '<span class="bad">Missing</span>';
-    return [ok ? 'Ready to develop' : 'Something is missing',
+    const rt = c.rawTherapee ? st(true)
+      : broken ? `<span class="bad">Can't run</span><button class="btn" data-act="repairrt">${busy ? 'Repairing…' : 'Repair'}</button>` : st(false);
+    return [ok ? 'Ready to develop' : broken && c.films ? 'RawTherapee needs a repair' : 'Something is missing',
       ok ? 'Darkroom develops your photos with RawTherapee and its film simulation library.'
+        : broken ? "RawTherapee is installed, but its command-line tool crashes when Darkroom starts it. Repair makes a copy that runs."
         : 'Run the Darkroom installer again to add what is missing, then reopen Darkroom.',
-      `<div class="g">${row({ title: 'RawTherapee', detail: 'The open-source raw processor', trail: st(c.rawTherapee) })}
+      `<div class="g">${row({ title: 'RawTherapee', detail: 'The open-source raw processor', trail: rt })}
         ${row({ title: 'Film simulations', detail: 'Kodak, Fuji, Ilford, Polaroid and more', trail: st(c.films) })}
         ${row({ title: 'Library', detail: 'Edits, marks and your look stay on this Mac', trail: '<span class="ok">' + ic('check', 'ic xs') + 'Ready</span>' })}</div>`];
   }
@@ -361,6 +367,7 @@ function settingsHTML() {
       + (on ? `<h2 class="g-h">Provider</h2>${aiOptionsHTML()}<p class="g-foot">Only the photo you ask about is sent, as a small copy.</p>` : '');
   } else if (tab === 'panel') body = picking ? `<h2 class="pick-h">Choose photographers</h2>${pickerHTML()}` : `${notice ? `<p class="onb-notice">${esc(notice)}</p>` : ''}${panelHTML()}`;
   else body = `<div class="g">${row({ title: 'Introduction', detail: 'How Selects, Best Work and My Look fit together', trail: '<button class="btn" data-act="replay">Show</button>' })}</div>`;
+  body = rawTherapeeHTML() + body;
   const label = tab === 'ai' && on && !setup.ai.enabled && !setup.panel.chosen ? 'Continue' : 'Save';
   const save = tab === 'intro' ? '' : picking
     ? `<button class="btn primary" data-act="pickdone" data-primary${draft.panel.length ? '' : ' disabled'}>Done</button>`
@@ -368,6 +375,32 @@ function settingsHTML() {
   const cancel = picking ? '<button class="btn plain" data-act="pickback">Back</button>' : `<button class="btn plain" data-act="close">${tab === 'intro' ? 'Done' : 'Cancel'}</button>`;
   return `<div class="onb-page settings"><div class="onb-shead"><h1 id="onbTitle">Settings</h1>${tabs}</div><div class="onb-body">${body}</div>${err ? `<p class="onb-err" role="alert">${esc(err)}</p>` : ''}</div>
     <div class="onb-foot"><span class="grow"></span>${cancel}${save}</div>`;
+}
+
+// RawTherapee that can't render: shown above every Settings tab until it's fixed.
+function rawTherapeeHTML() {
+  const c = setup.checks;
+  if (c.rawTherapee) return '';
+  const broken = c.rawTherapeeProblem === 'broken';
+  return `<div class="g">${row({
+    title: broken ? "RawTherapee can't run" : "RawTherapee isn't installed",
+    detail: broken ? 'Previews and export are unavailable. Repair makes a copy of its command-line tool that runs.'
+      : 'Previews and export are unavailable. Install RawTherapee 5.11 from rawtherapee.com, or run the Darkroom installer again.',
+    trail: `<button class="btn" data-act="repairrt">${busy ? 'Repairing…' : broken ? 'Repair' : 'Check Again'}</button>` })}</div>`;
+}
+
+async function repairRawTherapee() {
+  busy = true; err = ''; paint();
+  try {
+    setup = await api.post('/api/setup/rawtherapee', {});
+    if (!setup.checks.rawTherapee) err = setup.checks.rawTherapeeProblem === 'broken'
+      ? "RawTherapee still can't run. Reinstall RawTherapee 5.11 from rawtherapee.com, then try again."
+      : "RawTherapee isn't in your Applications folder yet.";
+    else toast('RawTherapee is working', { ms: 2400 });
+    emit('setup', setup);
+  } catch (e) { err = e.message || "Couldn't repair RawTherapee"; }
+  busy = false; paint();
+  loadLibrary().catch(() => {});
 }
 
 // ---------- Validation and saving ----------
@@ -486,6 +519,7 @@ function onClick(e) {
   else if (a === 'toggle') { draft.enabled = !draft.enabled; err = ''; paint(); }
   else if (a === 'save') save();
   else if (a === 'close') close();
+  else if (a === 'repairrt') repairRawTherapee();
   else if (a === 'replay') { mode = 'onboarding'; tour = true; step = 0; reset(); paint(); }
 }
 function refreshPicker() {

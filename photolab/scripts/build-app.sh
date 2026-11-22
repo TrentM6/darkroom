@@ -4,7 +4,8 @@
 #      .../Baseline Darkroom (a rename in place: catalog, edits, marks and My Look carry over untouched).
 #   1. Release build (scripts/build.sh: from a local mirror, outside iCloud).
 #   2. Support files, copied once to ~/Library/Application Support/Baseline Darkroom/: luts/ (≈400 MB film LUTs,
-#      referenced, not duplicated into the app) and bin/rawtherapee-cli. RawTherapee.app must be in /Applications.
+#      referenced, not duplicated into the app) and bin/rawtherapee-cli (signed ad hoc: see below). RawTherapee.app
+#      must be in /Applications.
 #   3. Bundle: Contents/MacOS/{BaselineDarkroom, rawtherapee-cli}, Contents/Resources/{studio/, AppIcon.icns from
 #      assets/}, Info.plist.
 #   4. Ad-hoc code signature with a fixed identifier (design.baselinestudio.darkroom).
@@ -39,9 +40,20 @@ BUILD="$ROOT/build/release"
 SRC="$ROOT/src"
 
 # Support files (once). The package's copies may be iCloud placeholders: cp downloads them.
+# rawtherapee-cli: the official build is sandbox-entitled and crashes when another program starts it (exit 133);
+# a copy signed ad hoc drops the entitlement. A copy that already runs is left alone.
+rt_runs() { [[ "$("$1" -v 2>/dev/null)" == *RawTherapee* ]]; }   # -v prints the version and exits 255
 if [ "$RELEASE" != 1 ]; then
   mkdir -p "$SUP/bin" "$SUP/luts"
-  if [ ! -x "$SUP/bin/rawtherapee-cli" ]; then cp "$PKG/bin/rawtherapee-cli" "$SUP/bin/rawtherapee-cli"; fi
+  if ! rt_runs "$SUP/bin/rawtherapee-cli"; then
+    for from in "$PKG/bin/rawtherapee-cli" /Applications/RawTherapee.app/Contents/MacOS/rawtherapee-cli; do
+      [ -x "$from" ] || continue
+      cp "$from" "$SUP/bin/.rawtherapee-cli.new" && codesign --force --sign - "$SUP/bin/.rawtherapee-cli.new" 2>/dev/null || continue
+      if rt_runs "$SUP/bin/.rawtherapee-cli.new"; then mv -f "$SUP/bin/.rawtherapee-cli.new" "$SUP/bin/rawtherapee-cli"; echo "rawtherapee-cli: copied from $from (signed ad hoc)"; break; fi
+    done
+    rm -f "$SUP/bin/.rawtherapee-cli.new"
+    rt_runs "$SUP/bin/rawtherapee-cli" || echo "warning: no rawtherapee-cli that runs; previews and export won't work" >&2
+  fi
   if [ ! -d "$SUP/luts/HaldCLUT/Color/Kodak" ]; then rsync -a "$PKG/luts/" "$SUP/luts/"; fi
   [ -d /Applications/RawTherapee.app ] || echo "warning: /Applications/RawTherapee.app is missing; previews and export won't work" >&2
 fi
@@ -49,7 +61,10 @@ fi
 STAGE="$(mktemp -d)/Baseline Darkroom.app"
 mkdir -p "$STAGE/Contents/MacOS" "$STAGE/Contents/Resources"
 cp "$BUILD/PhotoLabApp" "$STAGE/Contents/MacOS/BaselineDarkroom"
-[ "$RELEASE" = 1 ] || cp "$SUP/bin/rawtherapee-cli" "$STAGE/Contents/MacOS/rawtherapee-cli"
+if [ "$RELEASE" != 1 ] && rt_runs "$SUP/bin/rawtherapee-cli"; then
+  cp "$SUP/bin/rawtherapee-cli" "$STAGE/Contents/MacOS/rawtherapee-cli"
+  codesign --force --sign - "$STAGE/Contents/MacOS/rawtherapee-cli"
+fi
 rsync -a --exclude 'mock' "$SRC/Sources/PhotoLabCore/Resources/studio/" "$STAGE/Contents/Resources/studio/"
 # Licences travel with the app (Lucide's ISC licence requires its notice in every copy).
 cp "$REPO_ROOT/LICENSE" "$REPO_ROOT/THIRD_PARTY_NOTICES.md" "$STAGE/Contents/Resources/"
@@ -57,7 +72,7 @@ cp "$REPO_ROOT/LICENSE" "$REPO_ROOT/THIRD_PARTY_NOTICES.md" "$STAGE/Contents/Res
 # Icon
 cp "$PKG/assets/AppIcon.icns" "$STAGE/Contents/Resources/AppIcon.icns" || echo "warning: no icon" >&2
 
-VERSION="1.0"
+VERSION="1.1"
 BUILDNO="$(date +%Y%m%d%H%M)"
 cat > "$STAGE/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -87,7 +102,7 @@ cat > "$STAGE/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# Signature: rawtherapee-cli keeps its own (Developer ID) signature; the app is signed ad hoc with a fixed
+# Signature: rawtherapee-cli is signed ad hoc on its own (above); the app is signed ad hoc with a fixed
 # identifier AND an explicit designated requirement on that identifier. An ad-hoc signature's default
 # requirement is its code hash, which changes with every build, so macOS privacy grants (Desktop,
 # Documents, removable volumes) would be asked again after each rebuild; with this requirement they persist.

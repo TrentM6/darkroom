@@ -54,8 +54,41 @@ extension Studio {
             "ai": aiSetup,
             "starters": StudioStarter.all.map { ["id": $0.id, "name": $0.name, "note": $0.note, "film": $0.look.film] },
             "starter": starterId,
-            "checks": ["rawTherapee": rt != nil, "films": lutRoot != nil, "library": root.path] as [String: Any],
+            // rawTherapee: its CLI was found and actually runs (a probe, cached per file), not just that a file exists.
+            "checks": ["rawTherapee": rawTherapeeProblem == nil, "rawTherapeeProblem": rawTherapeeProblem ?? none,
+                       "films": lutRoot != nil, "library": root.path] as [String: Any],
         ]
+    }
+
+    /// Why RawTherapee can't render: nil, "notInstalled" (no /Applications/RawTherapee.app) or "broken" (no copy
+    /// of its CLI runs, or it kept crashing on launch).
+    public var rawTherapeeProblem: String? { StudioPaths.rawTherapeeProblem(rt) }
+
+    /// The user-facing line for `rawTherapeeProblem` (the part before ";" is the short form).
+    var rawTherapeeError: String? {
+        switch rawTherapeeProblem {
+        case "notInstalled"?: return "RawTherapee isn't installed (/Applications/RawTherapee.app); previews and export are unavailable"
+        case "broken"?: return "RawTherapee can't run; previews and export are unavailable until it's repaired in Settings"
+        default: return nil
+        }
+    }
+
+    /// Repair (Settings, onboarding): copies rawtherapee-cli from /Applications/RawTherapee.app into the support
+    /// folder again, signed ad hoc, if no copy runs; then renders what failed. True when RawTherapee now runs.
+    @discardableResult
+    public func repairRawTherapee() -> Bool {
+        let old = rt, gaveUp = old.map { RawTherapeeCLI.isDisabled($0) } ?? false
+        if let cur = old { RawTherapeeCLI.forget(cur) }
+        var found = StudioPaths.rawTherapee(log: log)
+        // The CLI given up on answers `-v` but crashed in renders: make a fresh copy instead of choosing it again.
+        if found == nil || (gaveUp && found == old) {
+            found = RawTherapeeCLI.install(from: RawTherapeeCLI.appCLI, to: StudioPaths.supportCLI, log: log) ? StudioPaths.supportCLI : nil
+        }
+        rtLock.lock(); _rt = found; rtLock.unlock()
+        sync { renderFailures.removeAll(); failingRenders = 0 }
+        log("RawTherapee \(found.map { "now at \($0.path)" } ?? "still unavailable")")
+        if found != nil { scanQueue.async { [weak self] in self?.rescanAll() } }
+        return found != nil
     }
 
     /// Who Claude Code is signed in as (runs `claude auth status`, about 0.2 s; no model call).

@@ -44,21 +44,43 @@ public enum StudioPaths {
         return false
     }
 
-    /// rawtherapee-cli: $PHOTOLAB_RT, the app bundle, the support folder, <package>/bin, PATH locations.
-    /// It links against /Applications/RawTherapee.app, so that must be installed too.
-    public static func rawTherapee() -> URL? {
+    /// The support folder's copy of rawtherapee-cli (made by install.sh, or repaired here).
+    public static var supportCLI: URL { support.appendingPathComponent("bin/rawtherapee-cli") }
+
+    /// rawtherapee-cli: $PHOTOLAB_RT, the app bundle, the support folder, <package>/bin, PATH locations; the first
+    /// one that actually runs (RawTherapeeCLI.runs, cached). Never /Applications/RawTherapee.app's own CLI: the
+    /// official build is sandbox-entitled and crashes when started by another program. When nothing runs, the
+    /// support-folder copy is repaired from /Applications/RawTherapee.app (copied and signed ad hoc), unless it
+    /// already runs. It links against /Applications/RawTherapee.app, so that must be installed too.
+    public static func rawTherapee(repair: Bool = true, log: ((String) -> Void)? = nil) -> URL? {
         let fm = FileManager.default
         guard fm.fileExists(atPath: "/Applications/RawTherapee.app") || ProcessInfo.processInfo.environment["PHOTOLAB_RT"] != nil else { return nil }
+        let app = RawTherapeeCLI.appCLI.standardizedFileURL.path
         var c: [String] = []
-        if let env = ProcessInfo.processInfo.environment["PHOTOLAB_RT"] { c.append(env) }
+        if let env = ProcessInfo.processInfo.environment["PHOTOLAB_RT"], !env.isEmpty { c.append(env) }
         if let aux = Bundle.main.url(forAuxiliaryExecutable: "rawtherapee-cli") { c.append(aux.path) }
-        c.append(support.appendingPathComponent("bin/rawtherapee-cli").path)
+        c.append(supportCLI.path)
         let exe = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath().deletingLastPathComponent()
         c.append(exe.appendingPathComponent("../../../bin/rawtherapee-cli").standardizedFileURL.path)   // <package>/.build/<cfg>/x
         c.append(exe.appendingPathComponent("../../../../bin/rawtherapee-cli").standardizedFileURL.path) // <package>/.build/<triple>/<cfg>/x
         c.append(exe.appendingPathComponent("rawtherapee-cli").path)
-        c += ["/usr/local/bin/rawtherapee-cli", "/opt/homebrew/bin/rawtherapee-cli", "/Applications/RawTherapee.app/Contents/MacOS/rawtherapee-cli"]
-        return c.first { fm.isExecutableFile(atPath: $0) }.map { URL(fileURLWithPath: $0) }
+        c += ["/usr/local/bin/rawtherapee-cli", "/opt/homebrew/bin/rawtherapee-cli"]
+        var seen = Set<String>()
+        for path in c where seen.insert(path).inserted && URL(fileURLWithPath: path).standardizedFileURL.path != app {
+            guard fm.isExecutableFile(atPath: path) else { continue }
+            if RawTherapeeCLI.runs(URL(fileURLWithPath: path)) { return URL(fileURLWithPath: path) }
+            log?("rawtherapee-cli at \(path) doesn't run; skipped")
+        }
+        guard repair, fm.isExecutableFile(atPath: app) else { return nil }
+        // Nothing runs: repair the support-folder copy (missing, or broken: it can't be in use).
+        return RawTherapeeCLI.install(from: RawTherapeeCLI.appCLI, to: supportCLI, log: log) ? supportCLI : nil
+    }
+
+    /// Why RawTherapee can't render, for Setup and Settings: nil (fine), "notInstalled" (no
+    /// /Applications/RawTherapee.app), "broken" (it's there but no copy of its CLI runs).
+    public static func rawTherapeeProblem(_ rt: URL?) -> String? {
+        if let rt, !RawTherapeeCLI.isDisabled(rt), RawTherapeeCLI.runs(rt) { return nil }
+        return FileManager.default.fileExists(atPath: "/Applications/RawTherapee.app") ? "broken" : "notInstalled"
     }
 
     /// Film LUT root (…/HaldCLUT/Color): $PHOTOLAB_LUTS, the support folder, <package>/luts.

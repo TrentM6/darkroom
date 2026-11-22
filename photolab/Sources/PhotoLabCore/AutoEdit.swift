@@ -636,8 +636,10 @@ public struct EditEngine {
     /// Runs rawtherapee-cli, retrying: parallel instances occasionally fail on startup.
     /// A run that exceeds `timeout` is killed and not retried (e.g. macOS is holding the read of an
     /// original behind a privacy prompt).
+    /// A run that dies on a signal within 3 s is a launch crash (e.g. a sandbox-entitled CLI): it isn't retried,
+    /// and after a few in a row RawTherapee counts as unavailable (RawTherapeeCLI), so nothing more is started.
     func runRT(_ args: [String], output: URL, timeout: TimeInterval = 120) -> Bool {
-        guard let rt else { return false }
+        guard let rt, !RawTherapeeCLI.isDisabled(rt) else { return false }
         let fm = FileManager()
         for _ in 0..<3 {
             try? fm.removeItem(at: output)
@@ -648,12 +650,16 @@ public struct EditEngine {
             proc.standardError = FileHandle.nullDevice
             let done = DispatchSemaphore(value: 0)
             proc.terminationHandler = { _ in done.signal() }
+            let started = Date()
             guard (try? proc.run()) != nil else { continue }
             if done.wait(timeout: .now() + timeout) == .timedOut {
                 proc.terminate()
                 if done.wait(timeout: .now() + 2) == .timedOut { kill(proc.processIdentifier, SIGKILL); _ = done.wait(timeout: .now() + 2) }
                 return false
             }
+            let crashed = proc.terminationReason == .uncaughtSignal && Date().timeIntervalSince(started) < 3
+            RawTherapeeCLI.noteLaunch(rt, crashed: crashed)
+            if crashed { return false }
             if proc.terminationStatus == 0 && fm.fileExists(atPath: output.path) { return true }
         }
         return false

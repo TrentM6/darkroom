@@ -86,8 +86,11 @@ extension Studio {
                 "exportDir": dir ?? NSNull(),
                 "projectFolders": lib.projectFolders,
                 "films": filmsJSON(),
-                "engine": ["rawTherapee": rt != nil, "luts": lutRoot != nil,
-                           "error": rt == nil ? "RawTherapee isn't installed (/Applications/RawTherapee.app); previews and export are unavailable" as Any : NSNull(),
+                "engine": ["rawTherapee": rawTherapeeProblem == nil, "luts": lutRoot != nil,
+                           "problem": rawTherapeeProblem ?? NSNull() as Any,
+                           "error": rawTherapeeError ?? NSNull() as Any,
+                           // Renders that failed since the last one that worked: the UI warns when this keeps growing.
+                           "failing": failingRenders,
                            // Analysis waits (rechecking every 30 s, resuming by itself) while free disk < needBytes.
                            "paused": diskWait ? "low-disk" as Any : NSNull(),
                            "freeBytes": Self.freeBytes(cache), "needBytes": Self.minFreeForAnalysis,

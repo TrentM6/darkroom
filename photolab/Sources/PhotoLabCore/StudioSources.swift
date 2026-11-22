@@ -45,6 +45,9 @@ final class FolderWatcher {
 
 extension Studio {
     static let imageExts: Set<String> = ["jpg", "jpeg", "tif", "tiff"]
+    /// Camera RAW files: not imported (Darkroom works from JPEG or TIFF), only reported when a folder has nothing else.
+    static let rawExts: Set<String> = ["raf", "dng", "cr3", "cr2", "crw", "nef", "nrw", "arw", "srf", "sr2", "orf", "rw2", "pef", "srw",
+                                       "raw", "rwl", "3fr", "fff", "iiq", "x3f", "erf", "mos", "kdc", "mrw", "dcr"]
     /// Folders never searched for shoots (catalogs, caches, Capture One/Lightroom internals, trash).
     static let skipFolders: Set<String> = ["captureone", "cache", "caches", "trash", "proxies", "thumbnails", "previews", "lightroom", "photolab library"]
     static let skipSuffixes = [".cosessiondb", ".lrdata", ".lrlibrary", ".photoslibrary", ".app", ".lrcat", ".bundle", ".cocatalog"]
@@ -97,6 +100,11 @@ extension Studio {
 
     /// Connects a folder. A folder holding images is one project; a folder of shoot folders is a
     /// source whose subfolders become projects. Returns the source and its project ids.
+    /// Subfolders of an attached source that hold only RAW files (no project), for the message after attaching.
+    public func rawOnly(_ path: String) -> [[String: Any]] {
+        Self.rawOnlyFolders(URL(fileURLWithPath: path)).map { ["name": $0.folder.lastPathComponent, "path": $0.folder.path, "count": $0.count] }
+    }
+
     public func attach(_ rawPath: String) throws -> (source: SourceRef, projects: [String], existing: Bool) {
         let path = (rawPath.trimmingCharacters(in: .whitespacesAndNewlines) as NSString).expandingTildeInPath
         guard path.hasPrefix("/") else { throw StudioError.bad("choose a folder (a full path)") }
@@ -126,7 +134,11 @@ extension Studio {
         if !direct.stable.isEmpty || !direct.unstable.isEmpty {
             kind = "folder"
         } else {
-            guard !Self.discoverProjects(url).isEmpty else { throw StudioError.bad("no JPEG or TIFF photos in that folder or its subfolders") }
+            guard !Self.discoverProjects(url).isEmpty else {
+                let raw = Self.rawOnlyFolders(url)
+                if !raw.isEmpty { throw StudioError.bad(Self.rawOnlyMessage(raw)) }
+                throw StudioError.bad("no JPEG or TIFF photos in that folder or its subfolders")
+            }
             kind = "source"
         }
         let src = SourceRef(id: "src-" + String(UUID().uuidString.prefix(8)).lowercased(), path: url.path, kind: kind, added: Store.iso())
@@ -213,6 +225,34 @@ extension Studio {
         }
         walk(root, 1)
         return out
+    }
+
+    /// Folders under `root` (and `root` itself) holding camera RAW files but no JPEG or TIFF: they make no project.
+    static func rawOnlyFolders(_ root: URL, depth: Int = 4) -> [(folder: URL, count: Int)] {
+        var out: [(URL, Int)] = []
+        let fm = FileManager.default
+        func walk(_ d: URL, _ level: Int) {
+            guard level <= depth, let items = try? fm.contentsOfDirectory(at: d, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) else { return }
+            let exts = items.map { $0.pathExtension.lowercased() }
+            if exts.contains(where: { imageExts.contains($0) }) { return }   // a project
+            let raws = exts.filter { rawExts.contains($0) }.count
+            if raws > 0 { out.append((d.standardizedFileURL, raws)) }
+            for s in items.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) where (try? s.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+                let n = s.lastPathComponent.lowercased()
+                if skipFolders.contains(n) || n.hasPrefix("settings") || skipSuffixes.contains(where: { n.hasSuffix($0) }) { continue }
+                walk(s, level + 1)
+            }
+        }
+        walk(root, 0)
+        return out
+    }
+
+    /// "Test RAW: 6 RAW files and no JPEG or TIFF. Darkroom works from JPEGs; …"
+    static func rawOnlyMessage(_ folders: [(folder: URL, count: Int)]) -> String {
+        let total = folders.reduce(0) { $0 + $1.count }
+        let files = total == 1 ? "1 RAW file" : "\(total) RAW files"
+        let what = folders.count == 1 ? "\(folders[0].folder.lastPathComponent): \(files)" : "\(folders.count) folders with \(files)"
+        return "\(what) and no JPEG or TIFF. Darkroom works from JPEGs; export JPEGs from your camera or RAW converter first."
     }
 
     static func projectName(_ folder: URL) -> String {

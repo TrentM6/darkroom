@@ -126,7 +126,11 @@ public final class StudioServer {
             let lib = studio.libraryJSON()
             let projects = ((lib["projects"] as? [[String: Any]]) ?? []).filter { r.projects.contains(($0["id"] as? String) ?? "") }
             let src = ((lib["sources"] as? [[String: Any]]) ?? []).first { ($0["id"] as? String) == r.source.id } ?? [:]
-            return .json(["source": src, "projects": projects, "projectId": r.projects.first ?? NSNull(), "existing": r.existing])
+            // Folders inside it with only RAW files make no project: say so (the message is ready to show).
+            let raw = r.source.kind == "source" ? studio.rawOnly(r.source.path) : []
+            let pairs = raw.map { (folder: URL(fileURLWithPath: $0["path"] as? String ?? ""), count: $0["count"] as? Int ?? 0) }
+            return .json(["source": src, "projects": projects, "projectId": r.projects.first ?? NSNull(), "existing": r.existing,
+                          "rawOnly": raw, "rawOnlyMessage": raw.isEmpty ? NSNull() : Studio.rawOnlyMessage(pairs) as Any])
         case ("DELETE", "sources", 2):
             try studio.detachSource(p[1])
             return .ok
@@ -193,6 +197,12 @@ public final class StudioServer {
         case ("POST", "setup", 1), ("PUT", "setup", 1):
             try studio.applySetup(body(req))
             return .json(studio.setupJSON())
+        case ("POST", "setup", 2) where p[1] == "rawtherapee":
+            // Repair: copy RawTherapee's CLI from /Applications/RawTherapee.app again and sign it ad hoc.
+            let fixed = studio.repairRawTherapee()
+            var d = studio.setupJSON()
+            d["repaired"] = fixed
+            return .json(d)
         case ("POST", "setup", 2) where p[1] == "test":
             let b = body(req)
             guard let provider = b["provider"] as? String, provider == "anthropic" || provider == "openai" else { throw StudioError.bad("provider must be anthropic or openai") }
@@ -385,7 +395,7 @@ public final class StudioServer {
             let outcome = studio.renderInteractive(pid, id, displayLong: Self.displayLong(req, b))
             var d = try studio.photoJSON(pid, id)
             d["stale"] = outcome == .stale
-            d["renderError"] = outcome == .failed ? (studio.rt == nil ? "RawTherapee isn't available" : "the preview couldn't be rendered") : NSNull()
+            d["renderError"] = outcome == .failed ? (studio.rawTherapeeProblem != nil ? "RawTherapee isn't available" : "the preview couldn't be rendered") : NSNull()
             d["ms"] = Int(Date().timeIntervalSince(t0) * 1000)
             return .json(d)
         case ("POST", "neutralize"):
@@ -550,6 +560,10 @@ public final class StudioServer {
         while rel.hasPrefix("/") { rel.removeFirst() }
         if rel.isEmpty || rel.hasSuffix("/") { rel += "index.html" }
         guard let dir = uiDir else { return fallbackPage() }
+        // Satoshi's @font-face only when the font is on disk (it isn't redistributed): no request for a missing file.
+        if rel == "fonts/faces.css", !FileManager.default.fileExists(atPath: dir.appendingPathComponent("fonts/Satoshi-Variable.woff2").path) {
+            return Resp(status: 200, type: "text/css; charset=utf-8", body: Data("/* Satoshi isn't bundled: Geist is used */\n".utf8))
+        }
         let url = dir.appendingPathComponent(rel).standardizedFileURL
         guard url.path.hasPrefix(dir.path + "/"), !rel.split(separator: "/").contains(where: { $0.hasPrefix(".") }) else { return .error(404, "not found") }
         var isDir: ObjCBool = false

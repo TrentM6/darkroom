@@ -13,7 +13,8 @@ const progress = new Map();   // pid -> {done, total}
 
 let lastSig = '';
 const sigOf = lib => JSON.stringify([(lib?.projects || []).map(p => [p.id, p.name, p.count, p.picks, p.favorites, p.status, p.cover, p.date, p.missing]),
-  (lib?.sources || []).map(s => [s.id, s.name]), lib?.engine?.paused || null, lib?.bestCount]);
+  (lib?.sources || []).map(s => [s.id, s.name]), lib?.engine?.paused || null, lib?.bestCount,
+  lib?.engine?.problem || null, (lib?.engine?.failing || 0) >= 3]);
 async function idleRefresh() {
   if (document.hidden) return;
   try {
@@ -35,6 +36,7 @@ export function initLibrary() {
   // Hooks for the Mac app shell (File > Attach Folder…, drag and drop, folder events).
   window.studio = Object.assign(window.studio || {}, {
     attached: r => {
+      rawOnlyNote(r);
       const ids = r?.projectIds || (r?.projects ? r.projects.map(p => p.id ?? p) : r?.projectId ? [r.projectId] : []);
       openWhenReady = ids.length === 1 ? ids[0] : null;
       refresh();
@@ -254,6 +256,11 @@ export async function locate(p) {
 }
 
 // ---------- Attach ----------
+// Subfolders with only RAW files make no project: the server says which, and the photographer is told.
+function rawOnlyNote(j) {
+  if (j?.rawOnlyMessage) toast(j.rawOnlyMessage, { ms: 12000 });
+}
+
 export async function attachFolder() {
   try {
     const native = window.photolab;
@@ -278,9 +285,11 @@ async function attachPath(path) {
     const ids = j.projectIds || (j.projects ? j.projects.map(p => p.id) : j.projectId ? [j.projectId] : []);
     openWhenReady = ids.length === 1 ? ids[0] : null;
     if (j.existing) toast('Already attached', { ms: 2000 });
+    rawOnlyNote(j);
     await refresh();
   } catch (err) {
-    toast(err.message && err.message.length < 80 ? err.message : "Couldn't attach that folder");
+    // (a folder of only RAW files explains itself: "Test RAW: 6 RAW files and no JPEG or TIFF. …")
+    toast(err.message && err.message.length < 200 ? err.message : "Couldn't attach that folder", { ms: 9000 });
   }
 }
 

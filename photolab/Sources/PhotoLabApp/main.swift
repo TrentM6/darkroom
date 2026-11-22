@@ -79,7 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     /// `takeover`: called by the watchdog after the attached server went away; if the catalog is still
     /// locked (that server is alive but busy), keep waiting instead of giving up.
     func startServer(takeover: Bool = false) {
-        let rt = StudioPaths.rawTherapee(), luts = StudioPaths.luts()
+        let rt = StudioPaths.rawTherapee(log: appLog), luts = StudioPaths.luts()
         appLog("launch: RawTherapee \(rt?.path ?? "NOT FOUND"), LUTs \(luts?.path ?? "NOT FOUND")")
         do {
             let s = try Studio(rt: rt, lutRoot: luts, log: appLog)

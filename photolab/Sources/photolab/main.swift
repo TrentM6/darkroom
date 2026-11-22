@@ -61,7 +61,7 @@ if cmd == "studio" {
         FileHandle.standardError.write(("\(f.string(from: Date())) \(s)\n").data(using: .utf8)!)
     }
     do {
-        let rt = StudioPaths.rawTherapee(), luts = StudioPaths.luts()
+        let rt = StudioPaths.rawTherapee(log: log), luts = StudioPaths.luts()
         if rt == nil { log("rawtherapee-cli not found: previews and export are unavailable") }
         if luts == nil { log("film LUTs not found: film simulation is off") }
         let studio = try Studio(rt: rt, lutRoot: luts, log: log)

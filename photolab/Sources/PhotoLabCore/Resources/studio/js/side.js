@@ -52,12 +52,15 @@ export function initSide() {
 const busy = p => p.status && !['ready', 'missing', 'error'].includes(p.status);
 
 function render() {
-  const ps = (store.library?.projects || []).filter(p => !p.linked);
-  const sum = k => ps.reduce((n, p) => n + (Number(p[k]) || 0), 0);
+  // Link folders (a collection's own photos) aren't listed as projects, but their marks count in All Selects and
+  // Best Work, which gather them too.
+  const all = store.library?.projects || [];
+  const ps = all.filter(p => !p.linked);
+  const sum = k => all.reduce((n, p) => n + (Number(p[k]) || 0), 0);
   const txt = (id, v) => { const el = $(id), t = String(v || ''); if (el.textContent !== t) el.textContent = t; };
   txt('#nProjects', ps.length);
   txt('#nSelects', sum('picks'));
-  txt('#nBest', ps.some(p => p.favorites != null) ? sum('favorites') : store.library?.bestCount);
+  txt('#nBest', all.some(p => p.favorites != null) ? sum('favorites') : store.library?.bestCount);
   // Patched only when something changed: the 5 s library poll never rebuilds the list.
   const html = groupedProjects().map(g => treeHTML(g)).join('');
   const cs = store.library?.collections || [];

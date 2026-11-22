@@ -29,6 +29,8 @@ That's it. In a few minutes Darkroom opens and walks you through setup. It's a f
 
 <sub>macOS 14 or later. Apple Silicon installs a ready-made app; Intel Macs build from source automatically.</sub>
 
+> **Use the command above, not the zip on the Releases page.** Darkroom isn't signed with an Apple Developer ID, so macOS blocks a copy downloaded in a browser ("can't be opened"). The installer downloads the same app without that block, checks it against its checksum, and sets up RawTherapee and the film library it needs.
+
 ---
 
 ## What you get
@@ -72,7 +74,8 @@ Every install is its own clean instance: your library, your look, your settings.
 - **Formats:** JPEG and TIFF, from your camera or your scans. RAW files are not read yet.
 - **Rendering** uses [RawTherapee](https://rawtherapee.com), the open-source raw processor, which the installer sets up for you (from rawtherapee.com, signature-checked), along with its film simulation library.
 - **Updating:** run the install command again. Your library is never touched.
-- **Why a Terminal command?** The app isn't signed with an Apple Developer ID, so a download from a browser would be blocked by macOS. The installer checks the download's checksum and signature instead.
+- **Why a Terminal command?** The app isn't signed with an Apple Developer ID, so a download from a browser would be blocked by macOS. The installer checks the download's checksum and signature instead. If you already downloaded the zip in a browser, run the install command instead of opening it.
+- **RawTherapee won't run?** The official RawTherapee app's command-line tool is sandboxed and crashes when another program starts it, so the installer keeps a working copy for Darkroom. If Darkroom says RawTherapee can't run, use **Repair** in Settings, or run the install command again.
 - **Where things live:** your catalog in `~/Library/Application Support/Baseline Darkroom/`, a self-trimming preview cache in `~/Library/Caches/Baseline Darkroom/`, exports on your Desktop.
 
 ---
@@ -125,8 +128,10 @@ photolab studio server (Swift, 127.0.0.1 only)
 
 ```bash
 photolab/scripts/release.sh
-gh release create v1.0 dist/Baseline-Darkroom-macOS-arm64.zip dist/Baseline-Darkroom-macOS-arm64.zip.sha256
+gh release create v1.1 --notes-file photolab/scripts/release-notes.md dist/Baseline-Darkroom-macOS-arm64.zip dist/Baseline-Darkroom-macOS-arm64.zip.sha256
 ```
+
+The notes in `photolab/scripts/release-notes.md` tell people to install with the command, not the zip (a browser download is blocked by Gatekeeper). For a published release: `gh release edit <tag> --notes-file photolab/scripts/release-notes.md`.
 
 `release.sh` builds from a clean export of the commit, refuses anything that may not be redistributed, and puts the licences inside the app. The installer picks up the newest release.
 

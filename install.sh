@@ -82,6 +82,25 @@ else
 fi
 rt_signed "$RT_APP" || note "note: $RT_APP isn't signed by the RawTherapee team; using it anyway (it's already installed)."
 
+# The official RawTherapee build signs rawtherapee-cli with the App Sandbox entitlement, so started by another
+# program it crashes before it runs (exit 133). Darkroom uses a copy signed ad hoc, which drops the entitlement
+# (its libraries still load from $RT_APP). The copy is checked before it replaces one that works.
+rt_runs() { [[ "$("$1" -v 2>/dev/null)" == *RawTherapee* ]]; }   # -v prints the version and exits 255 (no pipe: pipefail)
+install_cli() {   # install_cli <destination>
+  local dest="$1" tmp
+  mkdir -p "$(dirname "$dest")"
+  tmp="$(dirname "$dest")/.rawtherapee-cli.new"
+  rm -f "$tmp"
+  cp "$RT_APP/Contents/MacOS/rawtherapee-cli" "$tmp"
+  codesign --force --sign - "$tmp" 2>/dev/null || { rm -f "$tmp"; die "Couldn't sign the copy of rawtherapee-cli at $dest."; }
+  if ! rt_runs "$tmp"; then
+    rm -f "$tmp"
+    if rt_runs "$dest"; then note "kept the existing $dest: a fresh copy of RawTherapee's CLI doesn't run on this Mac"; return; fi
+    die "RawTherapee's command-line tool crashes on this Mac, so Darkroom can't render. Reinstall RawTherapee 5.11 from rawtherapee.com, then run this again."
+  fi
+  mv -f "$tmp" "$dest"
+}
+
 # Library folder: a PhotoLab install is renamed to Baseline Darkroom first (in place, never over an existing
 # folder, never while PhotoLab runs), before anything below creates the new folder.
 if [ -d "$LEGACY_SUP" ] && [ ! -e "$SUP" ]; then
@@ -134,8 +153,8 @@ if [ "$MODE" = prebuilt ]; then
     || die "The download isn't a valid Baseline Darkroom app; not installing it."
   ok "verified ($(defaults read "$NEW/Contents/Info" CFBundleVersion))"
   # Support files the app looks for: the LUTs, and a local copy of the CLI from the user's own RawTherapee.
-  mkdir -p "$SUP/bin"
-  cp "$RT_APP/Contents/MacOS/rawtherapee-cli" "$SUP/bin/rawtherapee-cli"
+  install_cli "$SUP/bin/rawtherapee-cli"
+  ok "rawtherapee-cli runs ($SUP/bin)"
   if [ -n "$LUT_DIR" ]; then mkdir -p "$SUP/luts"; rm -rf "$SUP/luts/HaldCLUT"; mv "$LUT_DIR" "$SUP/luts/HaldCLUT"; fi
   mkdir -p "$(dirname "$APP")"
   rm -rf "$APP"
@@ -179,8 +198,8 @@ else
   [ -x "$PKG/scripts/build-app.sh" ] || die "$PKG/scripts/build-app.sh is missing; is $SRC a Baseline Darkroom checkout?"
   # The build copies RawTherapee's CLI and the LUTs from the package (photolab/bin, photolab/luts; both git-ignored)
   # into the library folder the first time.
-  mkdir -p "$PKG/bin"
-  cp "$RT_APP/Contents/MacOS/rawtherapee-cli" "$PKG/bin/rawtherapee-cli"
+  install_cli "$PKG/bin/rawtherapee-cli"
+  install_cli "$SUP/bin/rawtherapee-cli"   # the build copies it only when missing; replace a broken one
   if [ -n "$LUT_DIR" ] && ! have_luts "$PKG/luts"; then
     [ -e "$PKG/luts" ] && die "$PKG/luts exists but has no HaldCLUT/Color/Kodak; remove it and run this again."
     mkdir -p "$TMP/lutroot"; mv "$LUT_DIR" "$TMP/lutroot/HaldCLUT"

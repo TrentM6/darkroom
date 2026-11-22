@@ -1,5 +1,16 @@
 [
   {
+    "id": "20261122-2100",
+    "items": [
+      "Darkroom checks that RawTherapee actually runs. If it can't, onboarding and Settings say so, and Repair makes a copy that works (previews and export no longer fail without a word)",
+      "A photo that fails to render is tried again later, not every second",
+      "Attaching a folder of only RAW files tells you why it made no project",
+      "Every view is the contact sheet; the grid toggle is gone",
+      "All Selects and Best Work counts in the sidebar match what the views show",
+      "The editor's busy line shows only while a photo is loading, not while an edit renders"
+    ]
+  },
+  {
     "id": "20261122-1900",
     "items": [
       "Collections: your own bodies of work from any shoots. Press B to add the selection (or right-click, or drag onto a collection in the sidebar); drag to reorder, Delete to take a photo out",

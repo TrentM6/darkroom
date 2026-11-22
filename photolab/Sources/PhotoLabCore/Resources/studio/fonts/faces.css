@@ -1,0 +1,6 @@
+/* Satoshi (ITF Free Font License) may not be redistributed, so it is not in the repository. A private build with
+   fonts/Satoshi-Variable.woff2 on disk uses it; Darkroom's server answers this file with nothing when the font
+   isn't there (StudioServer.uiFile), so other builds fall back to Geist without requesting a missing file.
+   The family is "Darkroom Body", not "Satoshi": with no @font-face, the name "Satoshi" would match a copy installed on
+   the Mac (often only some styles, e.g. italic) instead of falling back to Geist. */
+@font-face { font-family: "Darkroom Body"; src: url("Satoshi-Variable.woff2") format("woff2"); font-weight: 300 900; font-display: fallback; }

@@ -53,7 +53,10 @@ struct ExportProgress {
 public final class Studio {
     public let root: URL          // catalog (small JSON only)
     public let cache: URL         // disposable previews
-    public let rt: URL?
+    /// rawtherapee-cli (nil: not installed or broken). Replaced by repairRawTherapee().
+    public var rt: URL? { rtLock.lock(); defer { rtLock.unlock() }; return _rt }
+    var _rt: URL?
+    let rtLock = NSLock()
     public let lutRoot: URL?
     let log: (String) -> Void
 
@@ -68,6 +71,10 @@ public final class Studio {
     // rendering
     var latest: [String: Int] = [:]
     var committed: [String: Int] = [:]
+    /// Failed background renders per photo ("<pid>/<id>"), so the same edit isn't retried every second.
+    var renderFailures: [String: RenderFailure] = [:]
+    /// Render failures since the last successful render (any photo): the UI warns when renders keep failing.
+    var failingRenders = 0
     var bgPending = Set<String>()
     var firstPending = Set<String>()
     var upgradePending = Set<String>()
@@ -135,9 +142,10 @@ public final class Studio {
     public init(root: URL = Studio.defaultRoot, cache: URL = Studio.defaultCache, rt: URL?, lutRoot: URL?, log: @escaping (String) -> Void) throws {
         self.root = root.standardizedFileURL
         self.cache = cache.standardizedFileURL
-        self.rt = rt
+        self._rt = rt
         self.lutRoot = lutRoot
         self.log = log
+        RawTherapeeCLI.logger = log
         let fm = FileManager.default
         try fm.createDirectory(at: self.root.appendingPathComponent("projects"), withIntermediateDirectories: true)
         try fm.createDirectory(at: self.cache, withIntermediateDirectories: true)
@@ -758,6 +766,11 @@ public final class Studio {
 
     enum RenderOutcome { case ok, stale, failed }
 
+    /// A photo whose render failed with these params: retried after `retryAt` (5 s, doubling to 5 min), and not
+    /// at all after `renderGiveUp` failures, until the edit changes, a render succeeds or RawTherapee is repaired.
+    struct RenderFailure { var params: EditParams; var count: Int; var retryAt: Date }
+    static let renderGiveUp = 5
+
     /// Renders the photo's current params (1600 px preview + 480 px thumb) with latest-wins:
     /// a render reaches disk only if no newer one for the same photo already has; an interactive
     /// request still waiting for a render slot gives up as soon as a newer one arrives.
@@ -772,6 +785,11 @@ public final class Studio {
             return (g, ph.ref, ph.params)
         }) else { return .failed }
         func superseded() -> Bool { sync { (latest[key] ?? 0) > gen } }
+        // The same edit failed before: background renders wait out its backoff and stop after a few tries.
+        // (Edits from the editor always try; with RawTherapee given up on, they fail without starting it.)
+        if !interactive, let f = sync({ renderFailures[key] }), f.params == params, f.count >= Self.renderGiveUp || Date() < f.retryAt {
+            return .failed
+        }
         let t0 = Date()
         if interactive {
             while renderSlots.wait(timeout: .now() + .milliseconds(40)) == .timedOut {
@@ -803,9 +821,21 @@ public final class Studio {
             log("edit render \(pid)/\(id) at \(small == nil ? "\(eng.previewLong)" : "\(Self.proxyBucket(displayLong ?? 0) ?? 0)") px: slot \(ms(t0, t1)) ms, render \(ms(t1, Date())) ms\(rendered ? "" : " (failed)")")
         }
         guard rendered else {
-            log("render failed: \(pid)/\(id)")
+            let n: Int = sync {
+                var f = renderFailures[key].flatMap { $0.params == params ? $0 : nil } ?? RenderFailure(params: params, count: 0, retryAt: .distantPast)
+                f.count += 1
+                f.retryAt = Date().addingTimeInterval(min(300, 5 * pow(2, Double(f.count - 1))))
+                renderFailures[key] = f
+                failingRenders += 1
+                return f.count
+            }
+            // Once RawTherapee is given up on, that is logged once (RawTherapeeCLI.noteLaunch), not per photo.
+            if let cli = rt, RawTherapeeCLI.isDisabled(cli) {}
+            else if n == 1 { log("render failed: \(pid)/\(id)") }
+            else if n == Self.renderGiveUp { log("render failed \(n) times: \(pid)/\(id); not retrying until the edit changes") }
             return .failed
         }
+        sync { renderFailures[key] = nil; failingRenders = 0 }
         let outcome: RenderOutcome = sync {
             if (committed[key] ?? 0) > gen { return .stale }
             guard let i = photoIndex(pid, id), projects[pid] != nil else { return .stale }

@@ -668,7 +668,7 @@ function sendRender(e) {
 async function doRender(e) {
   const seq = ++e.seq;
   const params = { ...e.cur };
-  busy(1);
+  // No busy line: the live preview already shows the edit; this only sharpens it.
   try {
     const j = await api.post(P.params(e.p.pid, e.p.id), { params, w: shownLong(), seq: nextSeq() });
     if (j.full) e.full = j.full;
@@ -700,7 +700,7 @@ async function doRender(e) {
     } else { e.shown = rendered; applyApprox(); }
   } catch (err) {
     if (ed === e && seq === e.seq) toast("Couldn't render");
-  } finally { busy(-1); }
+  }
 }
 
 let renderErrorShown = false;
@@ -724,7 +724,6 @@ async function reset(fromRedo = false) {
   e.seq++;
   e.cur = { ...e.auto };
   syncAll(); applyApprox(); layout();
-  busy(1);
   try {
     const j = await api.post(P.reset(e.p.pid, e.p.id), { w: shownLong() });
     e.p.edited = false;
@@ -742,7 +741,6 @@ async function reset(fromRedo = false) {
     await showPreview(api.url(bust(d.preview, e.seq)));
     layout();
   } catch (_) { toast("Couldn't reset"); }
-  finally { busy(-1); }
 }
 
 // ---------- Copy / paste ----------
